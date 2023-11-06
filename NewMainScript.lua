@@ -38,7 +38,7 @@ local function vapeGithubRequest(scripturl)
 				displayErrorPopup("The connection to github is taking a while, Please be patient.")
 			end
 		end)
-		suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/"..readfile("vape/commithash.txt").."/"..scripturl, true) end)
+		suc, res = pcall(function() return game:HttpGet("https://raw.githubusercontent.com/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfh/VapeV4ForRoblox/"..readfile("vape/commithash.txt").."/"..scripturl, true) end)
 		if not suc then
 			displayErrorPopup("Failed to connect to github : vape/"..scripturl.." : "..res)
 			error(res)
@@ -49,7 +49,7 @@ local function vapeGithubRequest(scripturl)
 end
 
 if not shared.VapeDeveloper then 
-	local commit = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.github.com/repos/7GrandDadPGN/VapeV4ForRoblox/commits", true))[1].commit.url:split("/commits/")[2]
+	local commit = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.github.com/repos/asfsnfskjsfjdgkjgfhfjhfjhfsjhjfjfh/VapeV4ForRoblox/commits", true))[1].commit.url:split("/commits/")[2]
 	if isfolder("vape") then 
 		if ((not isfile("vape/commithash.txt")) or readfile("vape/commithash.txt") ~= commit) then
 			for i,v in pairs({"vape/Universal.lua", "vape/MainScript.lua", "vape/GuiLibrary.lua"}) do 
